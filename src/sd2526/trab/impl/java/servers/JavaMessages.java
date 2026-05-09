@@ -107,7 +107,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 		
 		var sqlExpr = """
 				SELECT m.id FROM Message m
-				RIGHT JOIN InboxEntry e
+				INNER JOIN InboxEntry e
 				ON e.mid = m.id 
 				AND e.recipient = '%s'
 				WHERE (upper(m.subject) LIKE '%%%s%%' OR upper(m.contents) LIKE '%%%s%%')
