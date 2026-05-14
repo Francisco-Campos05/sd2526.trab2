@@ -30,7 +30,7 @@ MESSAGES_REP_PORT=5678
 MESSAGES_REP_EXTRA_ARGS_FIRST=primary
 MESSAGES_REP_EXTRA_ARGS_OTHER=secondary
 
-USERS_KEYSTORES=users.ourorg0.ks users.ourorg1.ks users.ourorg2.ks
-SERVERS_KEYSTORES=messages0.ourorg0.ks messages1.ourorg0.ks messages2.ourorg0.ks messages0.ourorg1.ks messages1.ourorg1.ks messages2.ourorg1.ks messages.ourorg2.ks
+USERS_KEYSTORES=users.ourorg0,users.ourorg0.ks,changeme users.ourorg1,users.ourorg1.ks,changeme users.ourorg2,users.ourorg2.ks,changeme
+SERVERS_KEYSTORES=messages0.ourorg0,messages0.ourorg0.ks,changeme messages1.ourorg0,messages1.ourorg0.ks,changeme messages2.ourorg0,messages2.ourorg0.ks,changeme messages0.ourorg1,messages0.ourorg1.ks,changeme messages1.ourorg1,messages1.ourorg1.ks,changeme messages2.ourorg1,messages2.ourorg1.ks,changeme messages.ourorg2,messages.ourorg2.ks,changeme
 CLIENT_TRUSTSTORE=client-truststore.ks
 CLIENT_TRUSTSTORE_PWD=changeme
