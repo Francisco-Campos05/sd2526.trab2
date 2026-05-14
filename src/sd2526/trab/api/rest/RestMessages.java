@@ -18,6 +18,7 @@ import sd2526.trab.api.Message;
 public interface RestMessages {
 	
 	final String PATH = "/messages";
+	final String HEADER_VERSION = "X-MESSAGES-version";
 	final String QUERY = "query";
 	final String NAME = "name";
 	final String PWD = "pwd";

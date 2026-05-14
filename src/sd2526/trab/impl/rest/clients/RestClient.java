@@ -43,7 +43,14 @@ public class RestClient {
 
 		config.property(ClientProperties.READ_TIMEOUT, READ_TIMEOUT);
 		config.property(ClientProperties.CONNECT_TIMEOUT, CONNECT_TIMEOUT);
-		this.client = ClientBuilder.newClient(config);
+		config.property(ClientProperties.FOLLOW_REDIRECTS, true);
+
+		var cb = ClientBuilder.newBuilder().withConfig(config);
+		if (serverURI.startsWith("https://")) {
+			cb.sslContext(sd2526.trab.impl.utils.TLSUtils.getClientContext())
+			  .hostnameVerifier((host, session) -> true);
+		}
+		this.client = cb.build();
 		this.target = client.target( serverURI ).path( servicePath );
 	}
 

@@ -35,12 +35,12 @@ import sd2526.trab.impl.utils.Sleep;
 
 public class JavaMessages extends JavaBaseService implements Messages, AdminMessages {
 	
-	private static final int REMOTE_COMM_DEADLINE = 90000;
 	private static final long MESSAGES_CACHE_EXPIRATION = 30000;
 	private static final long DIRTY_INBOX_CACHE_EXPIRATION = 10000;
 
-	final JobDispatcher jobs;
-	final AtomicLong counter = new AtomicLong(0L);	
+	protected final JobDispatcher jobs;
+	protected final AtomicLong counter = new AtomicLong(0L);
+	protected static final int REMOTE_COMM_DEADLINE = 90000;
 	private static Logger Log = Logger.getLogger(JavaMessages.class.getName());
 
 	
@@ -68,7 +68,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 			})
 			.build();
 	
-	private JavaMessages() {
+	protected JavaMessages() {
 		this.jobs = new JobDispatcher();
 	}
 
