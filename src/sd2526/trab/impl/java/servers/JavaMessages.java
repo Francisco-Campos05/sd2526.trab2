@@ -29,6 +29,7 @@ import sd2526.trab.api.java.Result;
 import sd2526.trab.api.java.Result.ErrorCode;
 import sd2526.trab.impl.api.java.AdminMessages;
 import sd2526.trab.impl.db.DB;
+import sd2526.trab.impl.db.Hibernate;
 import sd2526.trab.impl.java.clients.Clients;
 import sd2526.trab.impl.utils.IP;
 import sd2526.trab.impl.utils.Sleep;
@@ -70,6 +71,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 	
 	protected JavaMessages() {
 		this.jobs = new JobDispatcher();
+		Hibernate.getInstance(); // Eagerly initialize Hibernate/DB schema before serving requests
 	}
 
 	@Override

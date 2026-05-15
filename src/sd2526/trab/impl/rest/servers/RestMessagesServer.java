@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 import org.glassfish.jersey.server.ResourceConfig;
 
 import sd2526.trab.api.java.Messages;
+import sd2526.trab.impl.java.servers.JavaMessages;
 
 public class RestMessagesServer extends AbstractRestServer {
 	public static final int PORT = 4567;
@@ -21,6 +22,7 @@ public class RestMessagesServer extends AbstractRestServer {
 	}
 
 	public static void main(String[] args) {
+		JavaMessages.getInstance(); // Eagerly initialize DB before announcing service
 		new RestMessagesServer().start();
 	}
 }
