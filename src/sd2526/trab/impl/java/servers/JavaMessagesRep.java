@@ -265,10 +265,10 @@ public class JavaMessagesRep extends JavaMessages {
 
     private Result<Void> deleteFromInbox(String mid) {
         var sql = "SELECT * FROM InboxEntry e WHERE e.mid = '%s'".formatted(mid);
-        return DB.transaction(h -> {
-            h.getOne(mid, Message.class).thenWith(m -> h.deleteOne(m));
-            return h.select(sql, InboxEntry.class).thenWith(h::deleteMany);
-        });
+        // Only delete InboxEntry rows — see JavaMessages.deleteFromLocalInbox for reasoning.
+        return DB.transaction(h ->
+            h.select(sql, InboxEntry.class).thenWith(h::deleteMany)
+        );
     }
 
     private RestAdminMessagesRepClient repClientFor(String domain) {

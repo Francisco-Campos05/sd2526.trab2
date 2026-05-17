@@ -2,7 +2,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>sd2526</groupId>
-  <artifactId>sd2526-tp1</artifactId>
+  <artifactId>sd2526-tp1-ref</artifactId>
   <version>1</version>
   <build>
     <sourceDirectory>src</sourceDirectory>
@@ -90,7 +90,7 @@
         <configuration>
           <images>
             <image>
-              <name>smduarte/${project.artifactId}-${authors}</name>
+              <name>${project.artifactId}-${authors}</name>
               <build>
                 <dockerFile>${project.basedir}/Dockerfile</dockerFile>
               </build>
@@ -102,6 +102,6 @@
   </build>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <authors>smd</authors>
+    <authors>XXXXX-YYYYY</authors>
   </properties>
 </project>

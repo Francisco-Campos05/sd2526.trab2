@@ -22,7 +22,7 @@ import sd2526.trab.impl.db.DB;
 
 
 public class JavaUsers extends JavaBaseService implements Users, AdminUsers {
-	
+
 	private static Logger Log = Logger.getLogger(JavaUsers.class.getName());
 
 	private JavaUsers() {
@@ -31,17 +31,22 @@ public class JavaUsers extends JavaBaseService implements Users, AdminUsers {
 	@Override
 	public Result<String> postUser(User user) {
 		Log.info(() -> "postUser: user=%s\n".formatted(user));
-		
+
 		if( badUserInfo( user ) )
 			return error(BAD_REQUEST);
 
 		var userAddress = "%s@%s".formatted(user.getName(), THIS_DOMAIN);
 
 		return DB.getOne( user.getName(), User.class )
-				.thenWith( other -> user.matches( other ) ? ok( userAddress ): error( CONFLICT )	)		
+				.thenWith( other -> user.matches( other ) ? ok( userAddress ): error( CONFLICT )	)
 				.orElse( () -> {
-							user.setDomain( THIS_DOMAIN );		
-							return DB.persistOne(user).mapValue( __ -> userAddress );			
+							user.setDomain( THIS_DOMAIN );
+							var insertResult = DB.persistOne(user).mapValue( __ -> userAddress );
+							if (insertResult.isOK()) return insertResult;
+							// Handle concurrent duplicate-insert race (e.g. gateway retry during
+							// Hibernate lazy-init): if the user that beat us matches, return 200.
+							return DB.getOne(user.getName(), User.class)
+									.thenWith(other -> user.matches(other) ? ok(userAddress) : error(CONFLICT));
 				});
 	}
 

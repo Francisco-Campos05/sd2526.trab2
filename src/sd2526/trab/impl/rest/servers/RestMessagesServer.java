@@ -5,6 +5,7 @@ import java.util.logging.Logger;
 import org.glassfish.jersey.server.ResourceConfig;
 
 import sd2526.trab.api.java.Messages;
+import sd2526.trab.impl.db.Hibernate;
 import sd2526.trab.impl.java.servers.JavaMessages;
 
 public class RestMessagesServer extends AbstractRestServer {
@@ -29,7 +30,8 @@ public class RestMessagesServer extends AbstractRestServer {
 				break;
 			}
 		}
-		JavaMessages.getInstance(); // Eagerly initialize DB before announcing service
+		JavaMessages.getInstance();
+		Hibernate.getInstance(); // Eagerly initialize DB schema before announcing service
 		new RestMessagesServer(port).start();
 	}
 }

@@ -13,20 +13,29 @@ import sd2526.trab.impl.java.servers.JavaMessages;
 
 @Singleton
 public class RestMessagesResource extends RestResource implements RestMessages, RestAdminMessages {
-	
+
 	static boolean isGateway = false;
-	
-	Messages impl;	
+
+	/** Non-null when an external implementation (e.g. Zoho-backed) is injected. */
+	static Messages externalImpl = null;
+
+	/** Called by RestMessagesExternalServer before the server starts. */
+	public static synchronized void setExternalImpl(Messages impl) {
+		externalImpl = impl;
+	}
+
+	Messages impl;
 
 	synchronized Messages impl() {
+		if (externalImpl != null) return externalImpl;
 		if( impl == null )
-			impl = isGateway ? Clients.MessagesClient.get() : JavaMessages.getInstance();	
+			impl = isGateway ? Clients.MessagesClient.get() : JavaMessages.getInstance();
 		return impl;
 	}
-	
+
 	public RestMessagesResource() {}
-	
-	RestMessagesResource(boolean gw) {	
+
+	RestMessagesResource(boolean gw) {
 		isGateway = gw;
 	}
 	

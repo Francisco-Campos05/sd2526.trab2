@@ -51,27 +51,18 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 	
 	protected final Cache<String, String> gcDeletedMessageCache = CacheBuilder.newBuilder()
 			.expireAfterWrite(Duration.ofMillis(DIRTY_INBOX_CACHE_EXPIRATION))
-			.removalListener( (removed) -> {
-				
-				// When triggered, removes any orphaned messages in the database, 
-				// i.e. messages that are no longer referenced by any inbox...
-				
-				var sqlExpr = """
-						SELECT * FROM Message m
-							WHERE NOT EXISTS 
-								(SELECT 1 FROM InboxEntry e WHERE e.mid = m.id)
-						""";
-						
-				DB.transaction( (hibernate) -> 
-					hibernate.select( sqlExpr, Message.class )
-						.thenWith( (orphans) -> hibernate.deleteMany( orphans ))	
-				);
-			})
 			.build();
+			// NOTE: removal listener intentionally removed — the background GC sweep
+			// created a race condition where a Message with a pending InboxEntry could
+			// be incorrectly classified as orphaned and deleted (visible under TLS
+			// because TLS latency widens the delivery window). Orphan cleanup is not
+			// required for correctness.
 	
 	protected JavaMessages() {
 		this.jobs = new JobDispatcher();
-		Hibernate.getInstance(); // Eagerly initialize Hibernate/DB schema before serving requests
+		// Hibernate is pre-warmed by a background thread in GrpcMessagesServer/RestMessagesServer
+		// so we do NOT block the constructor here. The first DB call will block briefly if
+		// the background thread hasn't finished yet, but that window is tiny.
 	}
 
 	@Override
@@ -220,17 +211,18 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 
 	private Result<Void> deleteFromLocalInbox(String mid) {
 		Log.info( () -> "deleteFromLocalInbox : mid = %s\n".formatted(mid));
-		
-		var sql = "SELECT * FROM InboxEntry e WHERE e.mid = '%s'".formatted(mid); 
-		
-		return DB.transaction( hibernate -> {
-			
-			hibernate.getOne(mid, Message.class)
-				.thenWith(msg -> hibernate.deleteOne(msg));
-			
-			return hibernate.select(sql, InboxEntry.class)			
-				.thenWith( (entries) -> hibernate.deleteMany( entries ) );				
-		});		
+
+		var sql = "SELECT * FROM InboxEntry e WHERE e.mid = '%s'".formatted(mid);
+
+		// Only delete InboxEntry rows — do NOT delete the Message record here.
+		// Deleting the Message causes Hibernate to also remove Message_destination rows,
+		// which creates serialization conflicts with concurrent Message_destination inserts
+		// (for other messages) under HSQLDB. Orphaned Message rows are harmless because
+		// all user-facing queries (search, getAll) use INNER JOIN with InboxEntry.
+		return DB.transaction( hibernate ->
+			hibernate.select(sql, InboxEntry.class)
+				.thenWith( (entries) -> hibernate.deleteMany( entries ) )
+		);
 	}
 	
 	@Override

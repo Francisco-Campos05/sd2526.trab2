@@ -57,9 +57,9 @@ public abstract class AbstractGrpcServer extends AbstractServer {
 
 		Discovery.getInstance().announce(serviceName(), super.serverURI);
 
-		Log.info(String.format("%s gRPC Server ready @ %s\n", service, serverURI));
-
 		server.start();
+
+		Log.info(String.format("%s gRPC Server ready @ %s\n", service, serverURI));
 		Runtime.getRuntime().addShutdownHook(new Thread( () -> {
 			System.err.println("*** shutting down gRPC server since JVM is shutting down");
 			server.shutdownNow();
