@@ -23,6 +23,9 @@ public class ReplicatedOperation {
 
     private String userName;
 
+    /** URI of the replica that published this op — used to restrict cross-domain dispatch to one replica. */
+    private String publisherId;
+
     public ReplicatedOperation() {}
 
     public static ReplicatedOperation postMessage(long seqNum, Message message,
@@ -105,4 +108,6 @@ public class ReplicatedOperation {
     public void setDestinations(Set<String> destinations) { this.destinations = destinations; }
     public String getUserName() { return userName; }
     public void setUserName(String userName) { this.userName = userName; }
+    public String getPublisherId() { return publisherId; }
+    public void setPublisherId(String publisherId) { this.publisherId = publisherId; }
 }

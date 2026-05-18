@@ -29,6 +29,7 @@ import sd2526.trab.api.java.Result;
 import sd2526.trab.api.java.Result.ErrorCode;
 import sd2526.trab.impl.api.java.AdminMessages;
 import sd2526.trab.impl.db.DB;
+import sd2526.trab.impl.db.Hibernate;
 import sd2526.trab.impl.java.clients.Clients;
 import sd2526.trab.impl.utils.IP;
 import sd2526.trab.impl.utils.Sleep;
@@ -70,6 +71,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 	
 	protected JavaMessages() {
 		this.jobs = new JobDispatcher();
+		Hibernate.getInstance(); // Eagerly initialize Hibernate/DB schema
 	}
 
 	@Override
@@ -105,13 +107,14 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 	public Result<List<String>> searchInbox(String name, String pwd, String query) {
 		Log.info( () -> "searchInbox : name = %s, pwd = %s, query=%s\n".formatted(name, pwd, query));
 		
+		var safeQuery = query.toUpperCase().replace("'", "''");
 		var sqlExpr = """
 				SELECT m.id FROM Message m
 				INNER JOIN InboxEntry e
-				ON e.mid = m.id 
+				ON e.mid = m.id
 				AND e.recipient = '%s'
 				WHERE (upper(m.subject) LIKE '%%%s%%' OR upper(m.contents) LIKE '%%%s%%')
-				""".formatted(name, query.toUpperCase(), query.toUpperCase());
+				""".formatted(name, safeQuery, safeQuery);
 
 		return getUser(name, pwd )
 				.then( () -> DB.select( sqlExpr, String.class));		
