@@ -151,6 +151,13 @@ public class JavaMessagesRep extends JavaMessages {
 
     private void execPost(ReplicatedOperation op) {
         var msg = op.getMessage();
+        // Advance counter past replayed IDs so restarts don't reuse IDs (format: domain+NNNN)
+        var mid = msg.getId();
+        int plus = mid.lastIndexOf('+');
+        if (plus >= 0) {
+            try { counter.updateAndGet(c -> Math.max(c, Long.parseLong(mid.substring(plus + 1)))); }
+            catch (NumberFormatException ignored) {}
+        }
         messagesCache.put(msg.originId(), new Message(msg));
         messagesCache.put(msg.getId(), msg);
 
