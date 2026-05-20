@@ -13,22 +13,20 @@ import sd2526.trab.impl.java.servers.JavaMessages;
 
 @Singleton
 public class RestMessagesResource extends RestResource implements RestMessages, RestAdminMessages {
-	
-	static boolean isGateway = false;
-	
-	Messages impl;	
+
+	final boolean isGateway;
+
+	Messages impl;
 
 	synchronized Messages impl() {
 		if( impl == null )
-			impl = isGateway ? Clients.MessagesClient.get() : JavaMessages.getInstance();	
+			impl = isGateway ? Clients.MessagesClient.get() : JavaMessages.getInstance();
 		return impl;
 	}
-	
-	public RestMessagesResource() {}
-	
-	RestMessagesResource(boolean gw) {	
-		isGateway = gw;
-	}
+
+	public RestMessagesResource() { this.isGateway = false; }
+
+	RestMessagesResource(boolean gw) { this.isGateway = gw; }
 	
 	@Override
 	public String postMessage(String pwd, Message msg) {

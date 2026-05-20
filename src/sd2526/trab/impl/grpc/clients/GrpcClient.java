@@ -15,6 +15,7 @@ import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import sd2526.trab.api.java.Result;
 import sd2526.trab.api.java.Result.ErrorCode;
+import sd2526.trab.impl.utils.IP;
 import sd2526.trab.impl.utils.TLSUtils;
 
 public class GrpcClient {
@@ -24,7 +25,10 @@ public class GrpcClient {
 
 	protected GrpcClient(String serverUrl) {
 		this.serverURI = URI.create(serverUrl);
-		var tmf = TLSUtils.getTrustManagerFactory();
+		// Use TLS only when this container is itself a TLS server (has its own keystore).
+		// This ensures that plaintext-server containers also use plaintext for outgoing gRPC calls,
+		// preventing a TLS client → plaintext server mismatch in mixed-TLS test environments.
+		var tmf = TLSUtils.keystoreExists(IP.hostname()) ? TLSUtils.getTrustManagerFactory() : null;
 		if (tmf != null) {
 			try {
 				var sslCtx = GrpcSslContexts.forClient().trustManager(tmf).build();

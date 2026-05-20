@@ -74,6 +74,7 @@ public class RestMessagesRepResource extends RestResource
 
     @Override
     public void deleteMessage(String name, String mid, String pwd) {
+        waitForClientVersion(); // message must be in cache before we can check sender + delete
         super.resultOrThrow(impl.deleteMessage(name, mid, pwd));
         setVersionHeader();
     }

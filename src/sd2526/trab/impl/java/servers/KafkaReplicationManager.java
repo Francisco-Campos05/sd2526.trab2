@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -36,7 +37,8 @@ public class KafkaReplicationManager {
     private final KafkaProducer<String, byte[]> producer;
     private final AtomicLong currentOffset = new AtomicLong(-1L);
     private final AtomicLong seqCounter    = new AtomicLong(0L);
-    private final Map<String, Long> lastSidFromDomain = new ConcurrentHashMap<>();
+    // Set-based SID dedup: accepts messages arriving in any order, rejects only genuine retries
+    private final Map<String, Set<Long>> seenSidsFromDomain = new ConcurrentHashMap<>();
     private final ObjectMapper mapper = new ObjectMapper();
 
     public KafkaReplicationManager(String domain) {
@@ -85,11 +87,15 @@ public class KafkaReplicationManager {
 
     // ---- Cross-domain SID dedup ----
 
+    /**
+     * Returns true (and records the SID) if this is the first time we see this SID from
+     * the given source domain. Returns false if the SID has been seen before (duplicate).
+     * Set-based approach handles out-of-order arrivals correctly, unlike a monotonic tracker.
+     */
     public boolean checkAndUpdateSid(String sourceDomain, long sid) {
-        return lastSidFromDomain.compute(sourceDomain, (k, last) -> {
-            if (last != null && sid <= last) return last;
-            return sid;
-        }) == sid;
+        return seenSidsFromDomain
+                .computeIfAbsent(sourceDomain, k -> ConcurrentHashMap.newKeySet())
+                .add(sid);
     }
 
     // ---- Consumer ----
@@ -105,6 +111,7 @@ public class KafkaReplicationManager {
                     for (var record : records) {
                         try {
                             var op = mapper.readValue(record.value(), ReplicatedOperation.class);
+                            op.setKafkaOffset(record.offset()); // globally-unique SID for cross-domain dedup
                             handler.accept(op);
                         } catch (Exception e) {
                             Log.warning("Error applying op at offset " + record.offset() + ": " + e.getMessage());

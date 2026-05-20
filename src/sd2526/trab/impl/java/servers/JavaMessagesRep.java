@@ -53,22 +53,10 @@ public class JavaMessagesRep extends JavaMessages {
         var msg = msgResult.value();
         if (!name.equals(getName(msg.senderAddress()))) return error(ErrorCode.FORBIDDEN);
 
-        long sid = kafka.nextSeqNum();
-        var op = ReplicatedOperation.deleteMessage(sid, mid, new HashSet<>(msg.getDestination()));
+        var op = ReplicatedOperation.deleteMessage(kafka.nextSeqNum(), mid, new HashSet<>(msg.getDestination()));
         op.setPublisherId(myUri);
-        var result = applyAndReplicate(op);
-
-        // Cross-domain deletes — only this replica (the HTTP receiver) dispatches
-        msg.getDestination().stream()
-            .map(r -> r.split("@")[1])
-            .filter(d -> !d.equals(THIS_DOMAIN))
-            .distinct()
-            .forEach(domain -> jobs.submit(domain, () ->
-                super.reTry(() -> repClientFor(domain)
-                    .remoteDeleteMessageWithSid(mid, sid, THIS_DOMAIN),
-                    REMOTE_COMM_DEADLINE)));
-
-        return result;
+        return applyAndReplicate(op);
+        // Cross-domain dispatch happens in execDelete() using the Kafka offset as SID
     }
 
     @Override
@@ -115,6 +103,25 @@ public class JavaMessagesRep extends JavaMessages {
         var op = ReplicatedOperation.deleteInbox(kafka.nextSeqNum(), name);
         op.setPublisherId(myUri);
         return applyAndReplicate(op);
+    }
+
+    // ---- Cache with DB fallback ----
+
+    /**
+     * Override base-class cache lookup to also check the DB.
+     * The base cache expires after 30 s; for deleteMessage the message may have aged out
+     * even though it still exists in the DB (it was persisted there at delivery time).
+     */
+    @Override
+    protected Result<Message> getCachedMessage(String mid) {
+        var cached = super.getCachedMessage(mid);
+        if (cached.isOK()) return cached;
+        // Cache miss — try the DB (message may have been evicted from the 30-s cache)
+        var dbResult = DB.getOne(mid, Message.class);
+        if (dbResult.isOK()) {
+            messagesCache.put(mid, dbResult.value()); // re-warm the cache
+        }
+        return dbResult;
     }
 
     // ---- Core Kafka dispatch ----
@@ -164,9 +171,10 @@ public class JavaMessagesRep extends JavaMessages {
         if (!op.getLocalRecipients().isEmpty())
             persistToInboxSafe(op.getLocalRecipients(), msg);
 
-        // Cross-domain dispatch only from the replica that published this op
-        if (!op.getRemoteDestinations().isEmpty() && myUri.equals(op.getPublisherId())) {
-            long mySid = op.getSeqNum();
+        // All replicas attempt cross-domain dispatch — SID dedup at destination ensures exactly-once.
+        // Using all replicas (not just publisher) ensures delivery survives publisher failure (114b+).
+        if (!op.getRemoteDestinations().isEmpty()) {
+            long mySid = op.getKafkaOffset(); // Kafka offset is globally unique across all replicas
             op.getRemoteDestinations().stream()
                 .collect(Collectors.groupingBy(super::getDomain, Collectors.toSet()))
                 .forEach((domain, addrs) ->
@@ -183,11 +191,22 @@ public class JavaMessagesRep extends JavaMessages {
     }
 
     private void execDelete(ReplicatedOperation op) {
-        // Only handle local recipients; cross-domain is dispatched by the publisher in deleteMessage()
+        // Delete from local inbox on every replica
         op.getDestinations().stream()
             .map(r -> r.split("@")[1])
             .filter(THIS_DOMAIN::equals)
             .forEach(__ -> deleteFromLocalInbox(op.getMessageId()));
+
+        // All replicas attempt cross-domain delete dispatch — SID dedup at destination deduplicates.
+        long mySid = op.getKafkaOffset();
+        op.getDestinations().stream()
+            .map(r -> r.split("@")[1])
+            .filter(d -> !d.equals(THIS_DOMAIN))
+            .distinct()
+            .forEach(domain -> jobs.submit(domain, () ->
+                super.reTry(() -> repClientFor(domain)
+                    .remoteDeleteMessageWithSid(op.getMessageId(), mySid, THIS_DOMAIN),
+                    REMOTE_COMM_DEADLINE)));
     }
 
     private void execRemotePost(ReplicatedOperation op) {

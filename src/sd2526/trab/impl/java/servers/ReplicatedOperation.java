@@ -26,6 +26,9 @@ public class ReplicatedOperation {
     /** URI of the replica that published this op — used to restrict cross-domain dispatch to one replica. */
     private String publisherId;
 
+    /** Kafka offset assigned by the broker — used as the globally-unique cross-domain SID. */
+    private long kafkaOffset;
+
     public ReplicatedOperation() {}
 
     public static ReplicatedOperation postMessage(long seqNum, Message message,
@@ -110,4 +113,6 @@ public class ReplicatedOperation {
     public void setUserName(String userName) { this.userName = userName; }
     public String getPublisherId() { return publisherId; }
     public void setPublisherId(String publisherId) { this.publisherId = publisherId; }
+    public long getKafkaOffset() { return kafkaOffset; }
+    public void setKafkaOffset(long kafkaOffset) { this.kafkaOffset = kafkaOffset; }
 }

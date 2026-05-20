@@ -43,7 +43,6 @@ public class RestMessagesRepServer extends AbstractRestServer {
     }
 
     public static void main(String[] args) {
-        // args[0] would be "primary" or "secondary" in F2b — ignored for F1
         Log.info("Starting F1 (Kafka) replicated messages server");
         new RestMessagesRepServer().start();
     }
