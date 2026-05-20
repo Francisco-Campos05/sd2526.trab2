@@ -12,8 +12,8 @@ public class RestMessagesServer extends AbstractRestServer {
 
 	private static Logger Log = Logger.getLogger(RestMessagesServer.class.getName());
 
-	RestMessagesServer() {
-		super(Log, Messages.SERVICE_NAME, PORT);
+	RestMessagesServer(int port) {
+		super(Log, Messages.SERVICE_NAME, port);
 	}
 
 	@Override
@@ -22,7 +22,14 @@ public class RestMessagesServer extends AbstractRestServer {
 	}
 
 	public static void main(String[] args) {
+		int port = PORT;
+		for (int i = 0; i < args.length - 1; i++) {
+			if (args[i].equalsIgnoreCase("-port")) {
+				port = Integer.parseInt(args[i + 1]);
+				break;
+			}
+		}
 		JavaMessages.getInstance(); // Eagerly initialize DB before announcing service
-		new RestMessagesServer().start();
+		new RestMessagesServer(port).start();
 	}
 }

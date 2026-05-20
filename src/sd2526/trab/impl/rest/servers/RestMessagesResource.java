@@ -16,9 +16,18 @@ public class RestMessagesResource extends RestResource implements RestMessages, 
 
 	final boolean isGateway;
 
+	/** Non-null when an external implementation (e.g. Zoho-backed) is injected. */
+	static Messages externalImpl = null;
+
+	/** Called by RestMessagesExternalServer before the server starts. */
+	public static synchronized void setExternalImpl(Messages impl) {
+		externalImpl = impl;
+	}
+
 	Messages impl;
 
 	synchronized Messages impl() {
+		if (externalImpl != null) return externalImpl;
 		if( impl == null )
 			impl = isGateway ? Clients.MessagesClient.get() : JavaMessages.getInstance();
 		return impl;
