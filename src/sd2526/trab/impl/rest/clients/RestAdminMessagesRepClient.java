@@ -62,6 +62,34 @@ public class RestAdminMessagesRepClient extends RestClient implements AdminMessa
         });
     }
 
+    // ---- Single-shot variants (no internal retry — for URI cycling in execPost/execDelete) ----
+
+    public Result<Void> tryOncePostWithSid(Message msg, Long sid, String sourceDomain) {
+        try {
+            var req = target.path(RestAdminMessages.ADMIN).request();
+            if (sid != null) {
+                req = req.header("X-MESSAGES-SID", sid)
+                         .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
+            }
+            return super.toJavaResult(req.post(Entity.entity(msg, MediaType.APPLICATION_JSON)));
+        } catch (Exception e) {
+            return Result.error(Result.ErrorCode.TIMEOUT);
+        }
+    }
+
+    public Result<Void> tryOnceDeleteWithSid(String mid, Long sid, String sourceDomain) {
+        try {
+            var req = target.path(RestAdminMessages.ADMIN).path(mid).request();
+            if (sid != null) {
+                req = req.header("X-MESSAGES-SID", sid)
+                         .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
+            }
+            return super.toJavaResult(req.delete());
+        } catch (Exception e) {
+            return Result.error(Result.ErrorCode.TIMEOUT);
+        }
+    }
+
     // ---- Replication-specific endpoints ----
 
     public Result<Void> applyReplicatedOp(ReplicatedOperation op) {

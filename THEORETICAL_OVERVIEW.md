@@ -196,6 +196,9 @@ In `remotePostMessage`, the Zoho write happens **synchronously** before the loca
 | Set-based dedup | `ConcurrentHashMap.newKeySet()` per source domain | Out-of-order-safe deduplication |
 | Version header | `X-MESSAGES-VERSION` + `VersionHeaderHandler` | Monotonic reads across replicas |
 | Zoho Mail | REST + OAuth2 + Base64 body | External persistent message storage (E1 proxy) |
+| `originId` stability | `senderAddress()` instead of `sender` | Idempotent POST works across replicas and sender reformatting |
+| `?` wildcard in search | `replace("?", "_")` in LIKE query | Tester single-char wildcard correctly matched |
+| URI failover | Single-shot per-URI cycling in `tryAllUrisPost/Delete` | Cross-domain delivery survives dead replica without 30 s stall |
 
 ---
 
@@ -217,13 +220,31 @@ There is a window where the `Message` row has been committed but the `InboxEntry
 
 `deleteFromLocalInbox` issues `DELETE FROM InboxEntry WHERE mid = ?` which cascades correctly. However, if `Message` were deleted first while `InboxEntry` still exists, the `ON DELETE RESTRICT` foreign key would prevent it. The code currently goes through `InboxEntry` first (correct), but this dependency is fragile and should be documented or enforced by transaction ordering.
 
-### 3. repClientFor() — No Client Caching (performance)
+### 3. Cross-domain client caching (performance, minor)
 
-`JavaMessagesRep.repClientFor(domain)` creates a new `RestAdminMessagesRepClient` (and therefore a new Jersey `Client`) on every cross-domain call. Under TLS this means a full handshake per call. Should cache by domain URI, similar to how `ClientFactory` works.
+`JavaMessagesRep.tryAllUrisPost/Delete` creates a new `RestAdminMessagesRepClient` (and therefore a new Jersey `Client`) for each URI on every cross-domain call. Under TLS this means a full handshake per call. Should cache clients by URI, similar to how `ClientFactory` works.
 
 ### 4. seenSidsFromDomain — Unbounded Memory Growth (minor)
 
 `KafkaReplicationManager.seenSidsFromDomain` accumulates all SIDs ever seen from all source domains. Over a long-lived deployment with many messages this set grows without bound. A time-based eviction policy (e.g., evict SIDs older than N minutes) could bound memory at the cost of allowing very late retries to slip through.
+
+### FIXED: Message Idempotency Broken in Replicated Server (109b) ✅
+
+**Root cause**: `Message.originId()` was defined as `sender + "-" + creationTime`. The `sender` field is reformatted by the server from `"alice@ourorg0"` to `"Alice <alice@ourorg0>"` before the message is stored. In `doAsyncPostRep`, `setSender` was called before `messagesCache.put(originId, ...)`, so the cache entry was stored under `"Alice <alice@ourorg0>-T"`. But the lookup on a duplicate POST used the raw sender `"alice@ourorg0-T"` — a different key. This meant the idempotency check always missed, and every POST created a new message instead of returning the existing ID.
+
+**Fix**: changed `originId()` to use `senderAddress()` instead of `sender`. `senderAddress()` extracts just the email address from either `"alice@ourorg0"` or `"Alice <alice@ourorg0>"`, returning `"alice@ourorg0"` in both cases — so the key is stable regardless of formatting.
+
+### FIXED: searchInbox Does Not Support `?` Wildcard (114b) ✅
+
+**Root cause**: `JavaMessages.searchInbox` built a SQL `LIKE '%pattern%'` query. The tester uses `?` as a single-character wildcard (e.g., `They?ve` to match `They've`), but `?` has no special meaning in SQL LIKE — only `_` (single char) and `%` (any sequence) are SQL wildcards. Searches with `?` patterns returned no results.
+
+**Fix**: added `.replace("?", "_")` to the query sanitisation step in `searchInbox`, converting the tester's single-character wildcard to the SQL equivalent before building the LIKE expression.
+
+### FIXED: Cross-Domain Delivery Always Hits Same (Possibly Dead) URI (114b) ✅
+
+**Root cause**: `repClientFor(domain)` called `Discovery.knownUrisOf("Messages@domain", 1)` and always took `uris[0]`. All source replicas picked the same URI. If that URI belonged to a killed replica, all cross-domain delivery attempts timed out after 30 seconds per attempt. Since the `RestAdminMessagesRepClient` retry loop spends up to 30 s stuck on a dead URI, delivery could fail even though surviving replicas were available.
+
+**Fix**: replaced `repClientFor` with `tryAllUrisPost` / `tryAllUrisDelete` helper methods. These use new single-shot methods `tryOncePostWithSid` / `tryOnceDeleteWithSid` on `RestAdminMessagesRepClient` that make one attempt with no internal retry. The helpers cycle through all discovered URIs in sequence: a dead URI fails in ~100 ms (connection refused), and the next URI is tried immediately. As long as at least one replica is alive in the destination domain, delivery is guaranteed within the `REMOTE_COMM_DEADLINE`.
 
 ### FIXED: Cross-Domain SID Collision (113b) ✅
 

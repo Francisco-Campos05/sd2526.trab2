@@ -179,9 +179,7 @@ public class JavaMessagesRep extends JavaMessages {
                 .collect(Collectors.groupingBy(super::getDomain, Collectors.toSet()))
                 .forEach((domain, addrs) ->
                     jobs.submit(domain, () -> {
-                        var res = super.reTry(() -> repClientFor(domain)
-                            .remotePostMessageWithSid(msg, mySid, THIS_DOMAIN),
-                            REMOTE_COMM_DEADLINE);
+                        var res = tryAllUrisPost(domain, msg, mySid, THIS_DOMAIN);
                         if (res.error() == ErrorCode.TIMEOUT)
                             addrs.forEach(a ->
                                 persistToInboxSafe(List.of(msg.senderAddress()),
@@ -204,9 +202,7 @@ public class JavaMessagesRep extends JavaMessages {
             .filter(d -> !d.equals(THIS_DOMAIN))
             .distinct()
             .forEach(domain -> jobs.submit(domain, () ->
-                super.reTry(() -> repClientFor(domain)
-                    .remoteDeleteMessageWithSid(op.getMessageId(), mySid, THIS_DOMAIN),
-                    REMOTE_COMM_DEADLINE)));
+                tryAllUrisDelete(domain, op.getMessageId(), mySid, THIS_DOMAIN)));
     }
 
     private void execRemotePost(ReplicatedOperation op) {
@@ -230,9 +226,8 @@ public class JavaMessagesRep extends JavaMessages {
                 if (isLocalDomain(senderDomain))
                     persistToInboxSafe(List.of(msg.senderAddress()), errMsg);
                 else
-                    jobs.submit(senderDomain, () -> super.reTry(() ->
-                        repClientFor(senderDomain).remotePostMessage(errMsg),
-                        REMOTE_COMM_DEADLINE));
+                    jobs.submit(senderDomain, () ->
+                        tryAllUrisPost(senderDomain, errMsg, null, null));
             });
         }
     }
@@ -316,8 +311,39 @@ public class JavaMessagesRep extends JavaMessages {
         DB.transaction(h -> h.select(sql, InboxEntry.class).thenWith(h::deleteMany));
     }
 
-    private RestAdminMessagesRepClient repClientFor(String domain) {
-        var uris = Discovery.getInstance().knownUrisOf("Messages@" + domain, 1);
-        return new RestAdminMessagesRepClient(uris[0].toString());
+    /**
+     * Try every known URI for the destination domain in sequence, using a single-shot
+     * attempt per URI (no internal retry). Cycles through all URIs until one succeeds
+     * or the REMOTE_COMM_DEADLINE is exhausted. This ensures delivery survives a dead
+     * replica without spending 30 s stuck on it.
+     */
+    private Result<Void> tryAllUrisPost(String domain, Message msg, Long sid, String srcDomain) {
+        long deadline = System.currentTimeMillis() + REMOTE_COMM_DEADLINE;
+        Result<Void> res = error(ErrorCode.TIMEOUT);
+        while (System.currentTimeMillis() < deadline) {
+            var uris = Discovery.getInstance().knownUrisOf("Messages@" + domain, 1);
+            for (var uri : uris) {
+                res = new RestAdminMessagesRepClient(uri.toString())
+                          .tryOncePostWithSid(msg, sid, srcDomain);
+                if (res.isOK()) return res;
+            }
+            sd2526.trab.impl.utils.Sleep.ms(500);
+        }
+        return res;
+    }
+
+    private Result<Void> tryAllUrisDelete(String domain, String mid, Long sid, String srcDomain) {
+        long deadline = System.currentTimeMillis() + REMOTE_COMM_DEADLINE;
+        Result<Void> res = error(ErrorCode.TIMEOUT);
+        while (System.currentTimeMillis() < deadline) {
+            var uris = Discovery.getInstance().knownUrisOf("Messages@" + domain, 1);
+            for (var uri : uris) {
+                res = new RestAdminMessagesRepClient(uri.toString())
+                          .tryOnceDeleteWithSid(mid, sid, srcDomain);
+                if (res.isOK()) return res;
+            }
+            sd2526.trab.impl.utils.Sleep.ms(500);
+        }
+        return res;
     }
 }
