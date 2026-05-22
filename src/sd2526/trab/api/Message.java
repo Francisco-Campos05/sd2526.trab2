@@ -133,7 +133,7 @@ public class Message {
 	}
 	
 	public String originId() {
-		return "%s-%s".formatted( sender, creationTime );
+		return "%s-%s".formatted( senderAddress(), creationTime );
 	}
 	
 	public String senderAddress() {

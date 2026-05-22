@@ -57,6 +57,8 @@ public abstract class AbstractGrpcServer extends AbstractServer {
 
 		Discovery.getInstance().announce(serviceName(), super.serverURI);
 
+		Log.info(String.format("%s gRPC Server ready @ %s\n", service, serverURI));
+
 		server.start();
 
 		Log.info(String.format("%s gRPC Server ready @ %s\n", service, serverURI));

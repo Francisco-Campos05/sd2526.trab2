@@ -25,8 +25,9 @@ public class GrpcClient {
 
 	protected GrpcClient(String serverUrl) {
 		this.serverURI = URI.create(serverUrl);
-		// Only use TLS if the local container itself has a keystore (i.e. it is running in TLS mode).
-		// This prevents non-TLS deployments from accidentally trying to open a TLS connection.
+		// Use TLS only when this container is itself a TLS server (has its own keystore).
+		// This ensures that plaintext-server containers also use plaintext for outgoing gRPC calls,
+		// preventing a TLS client → plaintext server mismatch in mixed-TLS test environments.
 		var tmf = TLSUtils.keystoreExists(IP.hostname()) ? TLSUtils.getTrustManagerFactory() : null;
 		if (tmf != null) {
 			try {

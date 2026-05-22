@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.logging.Logger;
 import javax.net.ssl.*;
+import java.util.logging.Logger;
 
 public class TLSUtils {
 
@@ -77,6 +78,37 @@ public class TLSUtils {
 
     public static boolean keystoreExists(String hostname) {
         return new File(hostname + ".ks").exists();
+    }
+
+    public static KeyManagerFactory keyManagerFactory(String keystoreFile, String pwd) {
+        try {
+            var ks = loadKeyStore(keystoreFile, pwd);
+            var kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, pwd.toCharArray());
+            return kmf;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create KeyManagerFactory from: " + keystoreFile, e);
+        }
+    }
+
+    public static synchronized TrustManagerFactory getTrustManagerFactory() {
+        if (clientTmf != null) return clientTmf;
+
+        var tsFile = System.getenv("CLIENT_TRUSTSTORE");
+        if (tsFile == null) tsFile = "client-truststore.ks";
+        var tsPwd = System.getenv("CLIENT_TRUSTSTORE_PWD");
+        if (tsPwd == null) tsPwd = DEFAULT_PWD;
+
+        if (new File(tsFile).exists()) {
+            try {
+                var ts = loadKeyStore(tsFile, tsPwd);
+                clientTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                clientTmf.init(ts);
+            } catch (Exception e) {
+                Log.warning("Failed to load truststore for gRPC client: " + e.getMessage());
+            }
+        }
+        return clientTmf;
     }
 
     private static KeyStore loadKeyStore(String file, String pwd) throws Exception {

@@ -162,5 +162,10 @@
 			<artifactId>netty-codec-http</artifactId>
 			<version>4.1.131.Final</version>
 		</dependency>
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
+			<version>3.7.0</version>
+		</dependency>
 	</dependencies>
 </project>

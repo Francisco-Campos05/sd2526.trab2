@@ -17,6 +17,7 @@ import sd2526.trab.impl.utils.ZohoMailClient.ZohoEmail;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -107,6 +108,12 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
                 .filter(e -> e.subject().startsWith(SUBJECT_PREFIX))
                 .toList();
 
+        // Pre-seed sentFolderId from any existing Sent email so the first sendEmail
+        // call never needs to poll Zoho for it.
+        if (!all.isEmpty()) {
+            zoho.getSentFolderIdFromList();
+        }
+
         if (clearState) {
             Log.info("Clearing " + ours.size() + " SD2526 email(s)");
             for (ZohoEmail e : ours) {
@@ -117,8 +124,14 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
             }
         } else {
             Log.info("Loading " + ours.size() + " SD2526 email(s)");
+            // Deduplicate by mid: search may return both Sent and Inbox copies
+            Set<String> loadedMids = new HashSet<>();
             for (ZohoEmail ze : ours) {
                 String mid = ze.subject().substring(SUBJECT_PREFIX.length());
+                if (!loadedMids.add(mid)) {
+                    Log.info("Skipping duplicate Zoho copy for mid=" + mid);
+                    continue;
+                }
                 zohoIndex.put(mid, ze);
                 try {
                     String body = zoho.getEmailContent(ze.folderId(), ze.zohoId());
@@ -426,16 +439,61 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     }
 
     private String encodeMessage(Message msg) {
-        try { return mapper.writeValueAsString(msg); }
+        try {
+            // Base64-encode the JSON so angle brackets (<>) don't get HTML-escaped by Zoho.
+            String json = mapper.writeValueAsString(msg);
+            return java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
         catch (Exception e) { throw new RuntimeException(e); }
     }
 
     private Message parseBody(String body) {
-        try { return mapper.readValue(body, Message.class); }
-        catch (Exception e) {
-            Log.warning("Failed to parse message body: " + e.getMessage());
-            return null;
+        if (body == null || body.isBlank()) return null;
+        String s = body.trim();
+
+        // 1. Try Base64-encoded JSON (new format)
+        if (!s.startsWith("{") && !s.startsWith("[") && !s.startsWith("<")) {
+            try {
+                String decoded = new String(java.util.Base64.getDecoder().decode(s),
+                        java.nio.charset.StandardCharsets.UTF_8).trim();
+                return mapper.readValue(decoded, Message.class);
+            } catch (Exception ignored) {}
         }
+
+        // 2. Try raw JSON (legacy format or if Zoho returned it unmodified)
+        if (s.startsWith("{")) {
+            try { return mapper.readValue(s, Message.class); }
+            catch (Exception ignored) {}
+        }
+
+        // 3. Strip HTML wrapper and decode entities, then parse
+        if (s.startsWith("<")) {
+            String stripped = s.replaceAll("(?s)<[^>]*>", " ")
+                    .replace("&lt;", "<").replace("&gt;", ">")
+                    .replace("&amp;", "&").replace("&quot;", "\"")
+                    .replace("&#39;", "'").replace("&nbsp;", " ")
+                    .replaceAll("\\s+", " ").trim();
+            // The JSON might be somewhere inside — find the first '{'
+            int idx = stripped.indexOf('{');
+            if (idx >= 0) {
+                String candidate = stripped.substring(idx);
+                try { return mapper.readValue(candidate, Message.class); }
+                catch (Exception ignored) {}
+            }
+            // Try Base64 inside HTML (e.g., Zoho wraps our base64 in <html><body>...</body></html>)
+            String innerBase64 = stripped.trim();
+            if (!innerBase64.isEmpty() && !innerBase64.startsWith("{")) {
+                try {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(innerBase64),
+                            java.nio.charset.StandardCharsets.UTF_8).trim();
+                    return mapper.readValue(decoded, Message.class);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        Log.warning("parseBody: could not parse body (length=" + body.length()
+                + ", preview=" + body.substring(0, Math.min(100, body.length())) + ")");
+        return null;
     }
 
     /** Submits a Zoho I/O task to the serial background writer. */

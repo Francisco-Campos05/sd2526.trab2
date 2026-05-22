@@ -14,7 +14,7 @@ import sd2526.trab.impl.java.servers.JavaMessages;
 @Singleton
 public class RestMessagesResource extends RestResource implements RestMessages, RestAdminMessages {
 
-	static boolean isGateway = false;
+	final boolean isGateway;
 
 	/** Non-null when an external implementation (e.g. Zoho-backed) is injected. */
 	static Messages externalImpl = null;
@@ -33,11 +33,9 @@ public class RestMessagesResource extends RestResource implements RestMessages, 
 		return impl;
 	}
 
-	public RestMessagesResource() {}
+	public RestMessagesResource() { this.isGateway = false; }
 
-	RestMessagesResource(boolean gw) {
-		isGateway = gw;
-	}
+	RestMessagesResource(boolean gw) { this.isGateway = gw; }
 	
 	@Override
 	public String postMessage(String pwd, Message msg) {

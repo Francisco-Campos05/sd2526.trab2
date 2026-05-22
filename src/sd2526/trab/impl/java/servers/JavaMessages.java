@@ -60,9 +60,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 	
 	protected JavaMessages() {
 		this.jobs = new JobDispatcher();
-		// Hibernate is pre-warmed by a background thread in GrpcMessagesServer/RestMessagesServer
-		// so we do NOT block the constructor here. The first DB call will block briefly if
-		// the background thread hasn't finished yet, but that window is tiny.
+		Hibernate.getInstance(); // Eagerly initialize Hibernate/DB schema
 	}
 
 	@Override
@@ -98,13 +96,14 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 	public Result<List<String>> searchInbox(String name, String pwd, String query) {
 		Log.info( () -> "searchInbox : name = %s, pwd = %s, query=%s\n".formatted(name, pwd, query));
 		
+		var safeQuery = query.toUpperCase().replace("'", "''").replace("?", "_");
 		var sqlExpr = """
 				SELECT m.id FROM Message m
 				INNER JOIN InboxEntry e
-				ON e.mid = m.id 
+				ON e.mid = m.id
 				AND e.recipient = '%s'
 				WHERE (upper(m.subject) LIKE '%%%s%%' OR upper(m.contents) LIKE '%%%s%%')
-				""".formatted(name, query.toUpperCase(), query.toUpperCase());
+				""".formatted(name, safeQuery, safeQuery);
 
 		return getUser(name, pwd )
 				.then( () -> DB.select( sqlExpr, String.class));		
