@@ -3,11 +3,11 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>sd2526</groupId>
-	<artifactId>sd2526-tp1-ref</artifactId>
+	<artifactId>sd2526-tp2</artifactId>
 	<version>1</version>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<authors>XXXXX-YYYYY</authors>
+		<authors>67849-68600</authors>
 	</properties>
 	<build>
 		<sourceDirectory>src</sourceDirectory>

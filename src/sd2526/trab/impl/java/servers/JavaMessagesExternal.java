@@ -10,7 +10,12 @@ import sd2526.trab.impl.java.clients.Clients;
 import sd2526.trab.impl.utils.ZohoMailClient;
 import sd2526.trab.impl.utils.ZohoMailClient.ZohoEmail;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,7 +68,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
      */
     private final ConcurrentHashMap<String, Message> messageCache = new ConcurrentHashMap<>();
     /**
-     * recipientName (no @domain) → synchronised list of messageIds.
+     * recipientName (no @domain) → synchronized list of messageIds.
      */
     private final ConcurrentHashMap<String, List<String>> inboxMap = new ConcurrentHashMap<>();
 
@@ -73,7 +78,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     private final AtomicLong counter = new AtomicLong(0L);
 
     /**
-     * Single-threaded executor for ALL Zoho writes — serialises them and keeps
+     * Single-threaded executor for ALL Zoho writes — serializes them and keeps
      * them off the hot path. Daemon so it doesn't prevent JVM exit.
      */
     private final ExecutorService zohoWriter = Executors.newSingleThreadExecutor(r -> {
@@ -94,7 +99,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     public JavaMessagesExternal(boolean clearState) {
         Log.info("JavaMessagesExternal starting: domain=" + THIS_DOMAIN + " clearState=" + clearState);
 
-        // Run Zoho initialisation in a bounded background thread.  If Zoho is
+        // Run Zoho initialization in a bounded background thread.  If Zoho is
         // slow or unreachable the server still starts quickly.
         Thread init = new Thread(() -> {
             try {
@@ -123,9 +128,8 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
         // Pre-seed sentFolderId from any existing Sent email so the first sendEmail
         // call never needs to poll Zoho for it.
-        if (!all.isEmpty()) {
+        if (!all.isEmpty())
             zoho.getSentFolderIdFromList();
-        }
 
         if (clearState) {
             Log.info("Clearing " + ours.size() + " SD2526 email(s)");
@@ -140,6 +144,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
             Log.info("Loading " + ours.size() + " SD2526 email(s)");
             // Deduplicate by mid: search may return both Sent and Inbox copies
             Set<String> loadedMids = new HashSet<>();
+
             for (ZohoEmail ze : ours) {
                 String mid = ze.subject().substring(SUBJECT_PREFIX.length());
                 if (!loadedMids.add(mid)) {
@@ -147,9 +152,11 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
                     continue;
                 }
                 zohoIndex.put(mid, ze);
+
                 try {
                     String body = zoho.getEmailContent(ze.folderId(), ze.zohoId());
                     Message msg = parseBody(body);
+
                     if (msg != null) {
                         messageCache.put(mid, msg);
                         rebuildInboxFor(msg);
@@ -171,16 +178,21 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     @Override
     public Result<String> postMessage(String pwd, Message msg) {
         Log.info("postMessage: sender=" + msg.getSender());
+
         if (badParams(msg, msg.getSender())) return error(BAD_REQUEST);
+
         return getUser(msg.getSender(), pwd).thenWith(user -> doPost(user, msg));
     }
 
     @Override
     public Result<Message> getInboxMessage(String name, String mid, String pwd) {
         Log.info("getInboxMessage: name=" + name + " mid=" + mid);
+
         if (badParams(name, mid, pwd)) return error(BAD_REQUEST);
+
         return getUser(name, pwd).thenWith(user -> {
             if (!inboxContains(name, mid)) return error(NOT_FOUND);
+
             return fetchMessage(mid);
         });
     }
@@ -188,20 +200,26 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     @Override
     public Result<List<String>> getAllInboxMessages(String name, String pwd) {
         Log.info("getAllInboxMessages: name=" + name);
+
         if (badParams(name, pwd)) return error(BAD_REQUEST);
+
         return getUser(name, pwd).mapValue(u -> copyInbox(name));
     }
 
     @Override
     public Result<List<String>> searchInbox(String name, String pwd, String query) {
         Log.info("searchInbox: name=" + name + " query=" + query);
+
         if (badParams(name, pwd)) return error(BAD_REQUEST);
+
         if (query == null || query.isEmpty()) return getAllInboxMessages(name, pwd);
 
         String q = query.toUpperCase();
+
         return getUser(name, pwd).thenWith(user -> {
             List<String> ids = copyInbox(name);
             List<String> matches = new ArrayList<>();
+
             for (String mid : ids) {
                 Result<Message> r = fetchMessage(mid);
                 if (r.isOK()) {
@@ -218,7 +236,9 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     @Override
     public Result<Void> removeInboxMessage(String name, String mid, String pwd) {
         Log.info("removeInboxMessage: name=" + name + " mid=" + mid);
+
         if (badParams(name, mid, pwd)) return error(BAD_REQUEST);
+
         return getUser(name, pwd).then(() -> {
             removeFromInbox(name, mid);
             return ok();
@@ -228,10 +248,13 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     @Override
     public Result<Void> deleteMessage(String name, String mid, String pwd) {
         Log.info("deleteMessage: name=" + name + " mid=" + mid);
+
         if (badParams(name, mid, pwd)) return error(BAD_REQUEST);
+
         return getUser(name, pwd).thenWith(user -> {
             Result<Message> msgRes = fetchMessage(mid);
             if (!msgRes.isOK()) return error(FORBIDDEN);
+
             Message msg = msgRes.value();
 
             if (!getName(msg.senderAddress()).equals(name)) return error(FORBIDDEN);
@@ -246,7 +269,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
             // Delete from Zoho in background
             ZohoEmail ze = zohoIndex.remove(mid);
-            if (ze != null) {
+            if (ze != null)
                 submitZohoWrite(() -> {
                     try {
                         zoho.deleteEmail(ze.folderId(), ze.zohoId());
@@ -254,18 +277,16 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
                         Log.warning("Zoho delete error: " + e.getMessage());
                     }
                 });
-            }
 
             // Propagate to remote domains asynchronously
             Set<String> domains = msg.getDestination().stream()
                     .map(a -> a.split("@")[1]).collect(Collectors.toSet());
-            final String finalMid = mid;
+
             for (String domain : domains) {
-                if (!domain.equals(THIS_DOMAIN)) {
+                if (!domain.equals(THIS_DOMAIN))
                     submitDomainJob(domain, () ->
                             reTry(() -> Clients.AdminMessagesClient.get(domain)
-                                    .remoteDeleteMessage(finalMid), REMOTE_DEADLINE));
-                }
+                                    .remoteDeleteMessage(mid), REMOTE_DEADLINE));
             }
             return ok();
         });
@@ -298,11 +319,9 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
         // Inbox update AFTER Zoho write.
         for (String addr : msg.getDestination()) {
-            if (isLocalAddress(addr)) {
+            if (isLocalAddress(addr))
                 inboxList(getName(addr)).add(msg.getId());
-            }
         }
-
         return ok();
     }
 
@@ -320,7 +339,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
         // Delete from Zoho in background
         ZohoEmail ze = zohoIndex.remove(mid);
-        if (ze != null) {
+        if (ze != null)
             submitZohoWrite(() -> {
                 try {
                     zoho.deleteEmail(ze.folderId(), ze.zohoId());
@@ -328,7 +347,6 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
                     Log.warning("Zoho delete error: " + e.getMessage());
                 }
             });
-        }
         return ok();
     }
 
@@ -336,6 +354,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     public Result<Void> remoteDeleteUserInbox(String name) {
         Log.info("remoteDeleteUserInbox: name=" + name);
         inboxMap.remove(name);
+
         return ok();
     }
 
@@ -372,13 +391,13 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
             Map<String, Set<String>> byDomain = remote.stream()
                     .collect(Collectors.groupingBy(this::getDomain, Collectors.toSet()));
             final Message finalMsg = msg;
+
             for (String domain : byDomain.keySet()) {
                 submitDomainJob(domain, () ->
                         reTry(() -> Clients.AdminMessagesClient.get(domain)
                                 .remotePostMessage(finalMsg), REMOTE_DEADLINE));
             }
         }
-
         return ok(msg.getId());
     }
 
@@ -393,6 +412,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
             String body = zoho.getEmailContent(ze.folderId(), ze.zohoId());
             Message msg = parseBody(body);
             if (msg == null) return error(INTERNAL_ERROR);
+
             messageCache.put(mid, msg);
             return ok(msg);
         } catch (Exception e) {
@@ -421,7 +441,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     }
 
     /**
-     * Returns the synchronised inbox list for a recipient, creating it if absent.
+     * Returns the synchronized inbox list for a recipient, creating it if absent.
      */
     private List<String> inboxList(String name) {
         return inboxMap.computeIfAbsent(name,
@@ -431,6 +451,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     private boolean inboxContains(String name, String mid) {
         List<String> inbox = inboxMap.get(name);
         if (inbox == null) return false;
+
         synchronized (inbox) {
             return inbox.contains(mid);
         }
@@ -438,14 +459,16 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
     private void removeFromInbox(String name, String mid) {
         List<String> inbox = inboxMap.get(name);
-        if (inbox != null) synchronized (inbox) {
-            inbox.remove(mid);
-        }
+        if (inbox != null)
+            synchronized (inbox) {
+                inbox.remove(mid);
+            }
     }
 
     private List<String> copyInbox(String name) {
         List<String> inbox = inboxMap.get(name);
         if (inbox == null) return Collections.emptyList();
+
         synchronized (inbox) {
             return new ArrayList<>(inbox);
         }
@@ -456,9 +479,8 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
      */
     private void rebuildInboxFor(Message msg) {
         for (String addr : msg.getDestination()) {
-            if (isLocalAddress(addr)) {
+            if (isLocalAddress(addr))
                 inboxList(getName(addr)).add(msg.getId());
-            }
         }
     }
 
@@ -504,6 +526,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
             try {
                 return mapper.readValue(s, Message.class);
             } catch (Exception ignored) {
+
             }
         }
 
@@ -516,6 +539,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
                     .replaceAll("\\s+", " ").trim();
             // The JSON might be somewhere inside — find the first '{'
             int idx = stripped.indexOf('{');
+
             if (idx >= 0) {
                 String candidate = stripped.substring(idx);
                 try {
@@ -525,6 +549,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
             }
             // Try Base64 inside HTML (e.g., Zoho wraps our base64 in <html><body>...</body></html>)
             String innerBase64 = stripped.trim();
+
             if (!innerBase64.isEmpty() && !innerBase64.startsWith("{")) {
                 try {
                     String decoded = new String(java.util.Base64.getDecoder().decode(innerBase64),

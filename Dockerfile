@@ -8,7 +8,6 @@ ADD messages.props .
 
 # Generate TLS keystores inside Docker to avoid binary corruption from Windows git
 COPY generate-keystores.sh .
-RUN chmod +x generate-keystores.sh && ./generate-keystores.sh && rm generate-keystores.sh
-
+RUN sed -i 's/\r$//' generate-keystores.sh && chmod +x generate-keystores.sh && ./generate-keystores.sh && rm generate-keystores.sh
 # copy the jar created by assembly to the docker image
 COPY target/sd*.jar sd2526.jar
