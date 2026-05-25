@@ -38,40 +38,41 @@ public class RestAdminMessagesRepClient extends RestClient implements AdminMessa
                       .delete()));
     }
 
+    private Result<Void> doPost(Message msg, Long sid, String sourceDomain) {
+        var req = target.path(RestAdminMessages.ADMIN).request();
+
+        if (sid != null) {
+            req = req.header("X-MESSAGES-SID", sid)
+                    .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
+        }
+        return super.toJavaResult(req.post(Entity.entity(msg, MediaType.APPLICATION_JSON)));
+    }
+
+    private Result<Void> doDelete(String mid, Long sid, String sourceDomain) {
+        var req = target.path(RestAdminMessages.ADMIN).path(mid).request();
+
+        if (sid != null) {
+            req = req.header("X-MESSAGES-SID", sid)
+                    .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
+        }
+        return super.toJavaResult(req.delete());
+    }
+
     // ---- SID-aware variants (for replicated domains) ----
 
     public Result<Void> remotePostMessageWithSid(Message msg, Long sid, String sourceDomain) {
-        return super.reTry(() -> {
-            var req = target.path(RestAdminMessages.ADMIN).request();
-            if (sid != null) {
-                req = req.header("X-MESSAGES-SID", sid)
-                         .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
-            }
-            return super.toJavaResult(req.post(Entity.entity(msg, MediaType.APPLICATION_JSON)));
-        });
+        return super.reTry(() -> doPost(msg, sid, sourceDomain));
     }
 
     public Result<Void> remoteDeleteMessageWithSid(String mid, Long sid, String sourceDomain) {
-        return super.reTry(() -> {
-            var req = target.path(RestAdminMessages.ADMIN).path(mid).request();
-            if (sid != null) {
-                req = req.header("X-MESSAGES-SID", sid)
-                         .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
-            }
-            return super.toJavaResult(req.delete());
-        });
+        return super.reTry(() -> doDelete(mid, sid, sourceDomain));
     }
 
     // ---- Single-shot variants (no internal retry — for URI cycling in execPost/execDelete) ----
 
     public Result<Void> tryOncePostWithSid(Message msg, Long sid, String sourceDomain) {
         try {
-            var req = target.path(RestAdminMessages.ADMIN).request();
-            if (sid != null) {
-                req = req.header("X-MESSAGES-SID", sid)
-                         .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
-            }
-            return super.toJavaResult(req.post(Entity.entity(msg, MediaType.APPLICATION_JSON)));
+            return doPost(msg, sid, sourceDomain);
         } catch (Exception e) {
             return Result.error(Result.ErrorCode.TIMEOUT);
         }
@@ -79,12 +80,7 @@ public class RestAdminMessagesRepClient extends RestClient implements AdminMessa
 
     public Result<Void> tryOnceDeleteWithSid(String mid, Long sid, String sourceDomain) {
         try {
-            var req = target.path(RestAdminMessages.ADMIN).path(mid).request();
-            if (sid != null) {
-                req = req.header("X-MESSAGES-SID", sid)
-                         .header("X-MESSAGES-SOURCE-DOMAIN", sourceDomain);
-            }
-            return super.toJavaResult(req.delete());
+            return doDelete(mid, sid, sourceDomain);
         } catch (Exception e) {
             return Result.error(Result.ErrorCode.TIMEOUT);
         }
