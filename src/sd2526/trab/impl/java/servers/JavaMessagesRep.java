@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 import sd2526.trab.api.Message;
 import sd2526.trab.api.User;
@@ -313,18 +314,17 @@ public class JavaMessagesRep extends JavaMessages {
 
     /**
      * Try every known URI for the destination domain in sequence, using a single-shot
-     * attempt per URI (no internal retry). Cycles through all URIs until one succeeds
-     * or the REMOTE_COMM_DEADLINE is exhausted. This ensures delivery survives a dead
-     * replica without spending 30 s stuck on it.
+     * attempt per URI. Cycles through all URIs until one succeeds or the deadline is exhausted.
      */
-    private Result<Void> tryAllUrisPost(String domain, Message msg, Long sid, String srcDomain) {
+    private Result<Void> tryAllUris(String domain, Function<RestAdminMessagesRepClient, Result<Void>> call) {
         long deadline = System.currentTimeMillis() + REMOTE_COMM_DEADLINE;
         Result<Void> res = error(ErrorCode.TIMEOUT);
+
         while (System.currentTimeMillis() < deadline) {
             var uris = Discovery.getInstance().knownUrisOf("Messages@" + domain, 1);
+
             for (var uri : uris) {
-                res = new RestAdminMessagesRepClient(uri.toString())
-                          .tryOncePostWithSid(msg, sid, srcDomain);
+                res = call.apply(new RestAdminMessagesRepClient(uri.toString()));
                 if (res.isOK()) return res;
             }
             sd2526.trab.impl.utils.Sleep.ms(500);
@@ -332,18 +332,11 @@ public class JavaMessagesRep extends JavaMessages {
         return res;
     }
 
+    private Result<Void> tryAllUrisPost(String domain, Message msg, Long sid, String srcDomain) {
+        return tryAllUris(domain, client -> client.tryOncePostWithSid(msg, sid, srcDomain));
+    }
+
     private Result<Void> tryAllUrisDelete(String domain, String mid, Long sid, String srcDomain) {
-        long deadline = System.currentTimeMillis() + REMOTE_COMM_DEADLINE;
-        Result<Void> res = error(ErrorCode.TIMEOUT);
-        while (System.currentTimeMillis() < deadline) {
-            var uris = Discovery.getInstance().knownUrisOf("Messages@" + domain, 1);
-            for (var uri : uris) {
-                res = new RestAdminMessagesRepClient(uri.toString())
-                          .tryOnceDeleteWithSid(mid, sid, srcDomain);
-                if (res.isOK()) return res;
-            }
-            sd2526.trab.impl.utils.Sleep.ms(500);
-        }
-        return res;
+        return tryAllUris(domain, client -> client.tryOnceDeleteWithSid(mid, sid, srcDomain));
     }
 }
