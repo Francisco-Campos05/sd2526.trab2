@@ -12,6 +12,7 @@ import sd2526.trab.impl.db.DB;
 import sd2526.trab.impl.db.Hibernate;
 import sd2526.trab.impl.java.clients.Clients;
 import sd2526.trab.impl.utils.IP;
+import sd2526.trab.impl.utils.PerDomainExecutor;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -35,7 +36,8 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
     private static final long MESSAGES_CACHE_EXPIRATION = 30000;
     private static final long DIRTY_INBOX_CACHE_EXPIRATION = 10000;
 
-    protected final JobDispatcher jobs;
+    protected final PerDomainExecutor jobs;
+
     protected final AtomicLong counter = new AtomicLong(0L);
     protected static final int REMOTE_COMM_DEADLINE = 90000;
     private static Logger Log = Logger.getLogger(JavaMessages.class.getName());
@@ -59,8 +61,8 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
     // required for correctness.
 
     protected JavaMessages() {
-        this.jobs = new JobDispatcher();
-        Hibernate.getInstance(); // Eagerly initialize Hibernate/DB schema
+        this.jobs = new PerDomainExecutor();
+        Hibernate.getInstance();
     }
 
     @Override
@@ -201,7 +203,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
     public Result<Void> remotePostMessage(Message msg) {
         Log.info(() -> "postRemoteMessage : msg = %s\n".formatted(msg));
 
-        var localAddresses = getLocalRecipientAddresses(msg);
+        var localAddresses = msg.localAndRemoteSplit(super::isLocalAddress).local();
         return postToLocalInboxes(localAddresses, msg);
     }
 
@@ -233,27 +235,9 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
         return msg != null ? ok(msg) : error(FORBIDDEN);
     }
 
-    public final class JobDispatcher {
-
-        private final ConcurrentHashMap<String, ExecutorService> executors = new ConcurrentHashMap<>();
-
-        public void submit(String domain, Runnable job) {
-            ExecutorService executor = executors.computeIfAbsent(
-                    domain,
-                    d -> Executors.newSingleThreadExecutor(r -> {
-                        Thread t = new Thread(r);
-                        t.setUncaughtExceptionHandler((thr, ex) -> ex.printStackTrace());
-                        return t;
-                    })
-            );
-            executor.submit(job);
-        }
-    }
-
     public Result<String> doAsyncPost(User sender, Message msg) {
 
         return getCachedMessage(msg.originId()).mapValue(Message::getId).orElse(() -> {
-
 
             msg.setId("%s+%04d".formatted(THIS_DOMAIN, counter.incrementAndGet()));
 
@@ -263,8 +247,9 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 
             messagesCache.put(msg.getId(), msg); // For enabling delete of messages...
 
-            var localAddresses = getLocalRecipientAddresses(msg);
-            var remoteAddresses = getRemoteRecipientAddresses(msg);
+            var split = msg.localAndRemoteSplit(super::isLocalAddress);
+            var localAddresses = split.local();
+            var remoteAddresses = split.remote();
 
             Log.info(() -> "Local Recipients:" + localAddresses);
             Log.info(() -> "Remote Recipients:" + remoteAddresses);
@@ -297,6 +282,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 
     public Result<Void> doAsyncDelete(Message msg) {
         var domains = msg.getDestination().stream().map(r -> r.split("@")[1]).collect(Collectors.toSet());
+
         for (var domain : domains)
             if (domain.equals(IP.domain()))
                 deleteFromLocalInbox(msg.getId());
@@ -309,7 +295,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
     public void doAsyncRemotePost(String remoteDomain, Message msg) {
         Log.info(() -> "\nenqueueRemotePost : remoteDomain=%s, msg = %s\n".formatted(remoteDomain, msg));
         jobs.submit(remoteDomain, () ->
-            super.reTry(() -> Clients.AdminMessagesClient.get(remoteDomain).remotePostMessage(msg), REMOTE_COMM_DEADLINE));
+                super.reTry(() -> Clients.AdminMessagesClient.get(remoteDomain).remotePostMessage(msg), REMOTE_COMM_DEADLINE));
     }
 
     @Override
@@ -321,6 +307,7 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
         return DB.transaction(hibernate -> hibernate.select(sqlExpr, InboxEntry.class)
                 .thenWith((entries) -> {
                     hibernate.deleteMany(entries);
+
                     for (var e : entries)
                         gcDeletedMessageCache.put(e.mid, e.mid);
 
@@ -329,21 +316,12 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 
     }
 
-
-    private List<String> getLocalRecipientAddresses(Message msg) {
-        return msg.getDestination().stream().filter(super::isLocalAddress).toList();
-    }
-
-    private Set<String> getRemoteRecipientAddresses(Message msg) {
-        return msg.getDestination().stream().filter(Predicate.not(super::isLocalAddress)).collect(Collectors.toSet());
-    }
-
-
     static JavaMessages instance;
 
     public static synchronized JavaMessages getInstance() {
         if (instance == null)
             instance = new JavaMessages();
+
         return instance;
     }
 }

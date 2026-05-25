@@ -9,6 +9,7 @@ import sd2526.trab.impl.api.java.AdminMessages;
 import sd2526.trab.impl.java.clients.Clients;
 import sd2526.trab.impl.utils.ZohoMailClient;
 import sd2526.trab.impl.utils.ZohoMailClient.ZohoEmail;
+import sd2526.trab.impl.utils.PerDomainExecutor;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -90,11 +91,9 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
     /**
      * Per-domain executors for async remote delivery.
      */
-    private final ConcurrentHashMap<String, ExecutorService> domainExecutors = new ConcurrentHashMap<>();
+    private final PerDomainExecutor jobs = new PerDomainExecutor();
 
-    // -------------------------------------------------------------------------
     // Constructor / startup
-    // -------------------------------------------------------------------------
 
     public JavaMessagesExternal(boolean clearState) {
         Log.info("JavaMessagesExternal starting: domain=" + THIS_DOMAIN + " clearState=" + clearState);
@@ -284,7 +283,7 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
             for (String domain : domains) {
                 if (!domain.equals(THIS_DOMAIN))
-                    submitDomainJob(domain, () ->
+                    jobs.submit(domain, () ->
                             reTry(() -> Clients.AdminMessagesClient.get(domain)
                                     .remoteDeleteMessage(mid), REMOTE_DEADLINE));
             }
@@ -370,7 +369,9 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
 
         // Update in-memory state immediately so callers can read it right away
         messageCache.put(msg.getId(), msg);
-        for (String addr : getLocalRecipients(msg)) {
+
+        var split = msg.localAndRemoteSplit(this::isLocalAddress);
+        for (String addr : split.local()) {
             inboxList(getName(addr)).add(msg.getId());
         }
 
@@ -386,14 +387,14 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
         }
 
         // Deliver to remote domains asynchronously
-        Set<String> remote = getRemoteRecipients(msg);
+        Set<String> remote = split.remote();
         if (!remote.isEmpty()) {
             Map<String, Set<String>> byDomain = remote.stream()
                     .collect(Collectors.groupingBy(this::getDomain, Collectors.toSet()));
             final Message finalMsg = msg;
 
             for (String domain : byDomain.keySet()) {
-                submitDomainJob(domain, () ->
+                jobs.submit(domain, () ->
                         reTry(() -> Clients.AdminMessagesClient.get(domain)
                                 .remotePostMessage(finalMsg), REMOTE_DEADLINE));
             }
@@ -570,18 +571,5 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
      */
     private void submitZohoWrite(Runnable task) {
         zohoWriter.submit(task);
-    }
-
-    /**
-     * Submits an async delivery task for a specific remote domain.
-     */
-    private void submitDomainJob(String domain, Runnable job) {
-        domainExecutors.computeIfAbsent(domain, d ->
-                Executors.newSingleThreadExecutor(r -> {
-                    Thread t = new Thread(r);
-                    t.setUncaughtExceptionHandler((thr, ex) -> ex.printStackTrace());
-                    return t;
-                })
-        ).submit(job);
     }
 }

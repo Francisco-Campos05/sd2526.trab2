@@ -1,5 +1,6 @@
 package sd2526.trab.api;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -16,135 +17,150 @@ import jakarta.persistence.Id;
 @Entity
 public class Message {
 
-	@Id
-	private String id;	
-	
-	private String sender;
-		
-	private long creationTime;
+    @Id
+    private String id;
 
-	private String subject;	
-	
-	@Column(length = 16384)
-	private String contents;
-	
-	@ElementCollection(fetch = FetchType.EAGER)
-	private Set<String> destination;
-	
-	public Message() {
-		this(null, null, Collections.emptySet(), null, null);
-	}
-	
-	public Message(String sender, String destination, String subject, String contents) {
-		this(null, sender, Set.of(destination), subject, contents);
-	}
-	
-	public Message(String sender, Set<String> destinations, String subject, String contents) {
-		this(null, sender, destinations, subject, contents);
-	}
+    private String sender;
 
-	public Message(String id, String sender, String destination, String subject, String contents) {
-		this(id, sender, Set.of(destination), subject, contents);
-	}
-	
-	public Message(String id, String sender, Set<String> destinations, String subject, String contents) {
-		this.id = id;
-		this.sender = sender;
-		this.subject = subject;
-		this.contents = contents;
-		this.creationTime = System.currentTimeMillis();
-		this.destination = new HashSet<String>(destinations);
-	}
+    private long creationTime;
 
-	public Message(Message other) {
-		this.id = other.id;
-		this.sender = other.sender;
-		this.subject = other.subject;
-		this.contents = other.contents;
-		this.creationTime = other.creationTime;
-		this.destination = other.destination;
-	}
-	
-	public String getSender() {
-		return sender;
-	}
-	
-	public void setSender(String sender) {
-		this.sender = sender;
-	}
-		
-	public Set<String> getDestination() {
-		return destination;
-	}
-	
-	public void setDestination(Set<String> destination) {
-		this.destination = new HashSet<>(destination);
-	}
-	
-	public void addDestination(String destination) {
-		this.destination.add(destination);
-	}
+    private String subject;
 
-	public long getCreationTime() {
-		return creationTime;
-	}
+    @Column(length = 16384)
+    private String contents;
 
-	public void setCreationTime(long creationTime) {
-		this.creationTime = creationTime;
-	}
+    @ElementCollection(fetch = FetchType.EAGER)
+    private Set<String> destination;
 
-	public String getSubject() {
-		return subject;
-	}
+    public Message() {
+        this(null, null, Collections.emptySet(), null, null);
+    }
 
-	public void setSubject(String subject) {
-		this.subject = subject;
-	}
+    public Message(String sender, String destination, String subject, String contents) {
+        this(null, sender, Set.of(destination), subject, contents);
+    }
 
-	public String getContents() {
-		return contents;
-	}
+    public Message(String sender, Set<String> destinations, String subject, String contents) {
+        this(null, sender, destinations, subject, contents);
+    }
 
-	public void setContents(String contents) {
-		this.contents = contents;
-	}
+    public Message(String id, String sender, String destination, String subject, String contents) {
+        this(id, sender, Set.of(destination), subject, contents);
+    }
 
-	public String getId() {
-		return id;
-	}
+    public Message(String id, String sender, Set<String> destinations, String subject, String contents) {
+        this.id = id;
+        this.sender = sender;
+        this.subject = subject;
+        this.contents = contents;
+        this.creationTime = System.currentTimeMillis();
+        this.destination = new HashSet<String>(destinations);
+    }
 
-	public void setId(String id) {
-		this.id = id;
-	}
+    public Message(Message other) {
+        this.id = other.id;
+        this.sender = other.sender;
+        this.subject = other.subject;
+        this.contents = other.contents;
+        this.creationTime = other.creationTime;
+        this.destination = other.destination;
+    }
 
-	@Override
-	public String toString() {
-		return "MSG [id=" + id + ", sender=" + sender + ", destination=" + destination + "]";
-	}
-		
-	public Message cloneWithUserNotFound(String recipient) {
-		var unknownUserError = "FAILED TO SEND %s TO %s: UNKNOWN USER".formatted(id, recipient);
-		return new Message( "%s.%s".formatted(id, recipient), sender, senderAddress(), unknownUserError, contents);
-	}
-	
-	public Message cloneWithTimeout(String recipient) {
-		var unknownUserError = "FAILED TO SEND %s TO %s: TIMEOUT".formatted(id, recipient);
-		return new Message( "%s.%s".formatted(id, recipient), sender, senderAddress(), unknownUserError, contents);
-	}
-	
-	public String originId() {
-		return "%s-%s".formatted( senderAddress(), creationTime );
-	}
-	
-	public String senderAddress() {
-		int i = sender.indexOf('<');
-		if( i < 0 )
-			return sender;
-		else
-			return sender.substring(i + 1, sender.indexOf('>'));
-	}
-	
-	public String senderName() {
-		return senderAddress().split("@", 2)[0];
-	}	
+    public String getSender() {
+        return sender;
+    }
+
+    public void setSender(String sender) {
+        this.sender = sender;
+    }
+
+    public Set<String> getDestination() {
+        return destination;
+    }
+
+    public void setDestination(Set<String> destination) {
+        this.destination = new HashSet<>(destination);
+    }
+
+    public void addDestination(String destination) {
+        this.destination.add(destination);
+    }
+
+    public long getCreationTime() {
+        return creationTime;
+    }
+
+    public void setCreationTime(long creationTime) {
+        this.creationTime = creationTime;
+    }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public void setSubject(String subject) {
+        this.subject = subject;
+    }
+
+    public String getContents() {
+        return contents;
+    }
+
+    public void setContents(String contents) {
+        this.contents = contents;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    @Override
+    public String toString() {
+        return "MSG [id=" + id + ", sender=" + sender + ", destination=" + destination + "]";
+    }
+
+    public Message cloneWithUserNotFound(String recipient) {
+        var unknownUserError = "FAILED TO SEND %s TO %s: UNKNOWN USER".formatted(id, recipient);
+        return new Message("%s.%s".formatted(id, recipient), sender, senderAddress(), unknownUserError, contents);
+    }
+
+    public Message cloneWithTimeout(String recipient) {
+        var unknownUserError = "FAILED TO SEND %s TO %s: TIMEOUT".formatted(id, recipient);
+        return new Message("%s.%s".formatted(id, recipient), sender, senderAddress(), unknownUserError, contents);
+    }
+
+    public String originId() {
+        return "%s-%s".formatted(senderAddress(), creationTime);
+    }
+
+    public String senderAddress() {
+        int i = sender.indexOf('<');
+        if (i < 0)
+            return sender;
+        else
+            return sender.substring(i + 1, sender.indexOf('>'));
+    }
+
+    public String senderName() {
+        return senderAddress().split("@", 2)[0];
+    }
+
+    public record DestSplit(java.util.List<String> local, java.util.Set<String> remote) {
+    }
+
+    public DestSplit localAndRemoteSplit(java.util.function.Predicate<String> isLocal) {
+        var local = new ArrayList<String>();
+        var remote = new HashSet<String>();
+
+        for (String addr : this.destination) {
+            if (isLocal.test(addr))
+                local.add(addr);
+            else remote.add(addr);
+        }
+        return new DestSplit(local, remote);
+    }
 }
