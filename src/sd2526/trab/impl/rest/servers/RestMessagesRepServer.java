@@ -22,7 +22,7 @@ public class RestMessagesRepServer extends AbstractRestServer {
     RestMessagesRepServer() {
         super(Log, Messages.SERVICE_NAME, PORT);
         this.kafka = new KafkaReplicationManager(IP.domain());
-        this.impl  = new JavaMessagesRep(kafka, serverURI);
+        this.impl = new JavaMessagesRep(kafka, serverURI);
     }
 
     @Override
