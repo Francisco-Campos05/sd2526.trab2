@@ -17,7 +17,13 @@ import sd2526.trab.api.java.Result.ErrorCode;
 import sd2526.trab.impl.db.DB;
 import sd2526.trab.impl.discovery.Discovery;
 import sd2526.trab.impl.rest.clients.RestAdminMessagesRepClient;
+import sd2526.trab.impl.utils.Sleep;
 
+/**
+ * Extension of the base Messages service with active replication support.
+ * Integrates with Apache Kafka to ensure that all replicas of a server
+ * within the same domain process operations and maintain a consistent state.
+ */
 public class JavaMessagesRep extends JavaMessages {
 
     private static final Logger Log = Logger.getLogger(JavaMessagesRep.class.getName());
@@ -31,7 +37,9 @@ public class JavaMessagesRep extends JavaMessages {
         this.myUri = myUri;
     }
 
-    public KafkaReplicationManager getKafka() { return kafka; }
+    public KafkaReplicationManager getKafka() {
+        return kafka;
+    }
 
     // ---- Client-facing write overrides ----
 
@@ -50,8 +58,10 @@ public class JavaMessagesRep extends JavaMessages {
         if (!userResult.isOK()) return error(userResult.error());
 
         var msgResult = getCachedMessage(mid);
+
         if (!msgResult.isOK()) return error(ErrorCode.FORBIDDEN);
         var msg = msgResult.value();
+
         if (!name.equals(getName(msg.senderAddress()))) return error(ErrorCode.FORBIDDEN);
 
         var op = ReplicatedOperation.deleteMessage(kafka.nextSeqNum(), mid, new HashSet<>(msg.getDestination()));
@@ -71,6 +81,7 @@ public class JavaMessagesRep extends JavaMessages {
         long seq = kafka.nextSeqNum();
         var op = ReplicatedOperation.remotePost(seq,
                 sid != null ? sid : seq, sourceDomain, msg, knownLocal);
+
         op.setPublisherId(myUri);
         return applyAndReplicate(op);
     }
@@ -85,6 +96,7 @@ public class JavaMessagesRep extends JavaMessages {
         var op = ReplicatedOperation.remoteDelete(seq,
                 sid != null ? sid : seq, sourceDomain, mid);
         op.setPublisherId(myUri);
+
         return applyAndReplicate(op);
     }
 
@@ -92,9 +104,11 @@ public class JavaMessagesRep extends JavaMessages {
     public Result<Void> removeInboxMessage(String name, String mid, String pwd) {
         Log.info(() -> "removeInboxMessage (F1): name=" + name + " mid=" + mid);
         var userResult = getUser(name, pwd);
+
         if (!userResult.isOK()) return error(userResult.error());
         var op = ReplicatedOperation.removeInboxEntry(kafka.nextSeqNum(), mid, name);
         op.setPublisherId(myUri);
+
         return applyAndReplicate(op);
     }
 
@@ -103,6 +117,7 @@ public class JavaMessagesRep extends JavaMessages {
         Log.info(() -> "remoteDeleteUserInbox (F1): name=" + name);
         var op = ReplicatedOperation.deleteInbox(kafka.nextSeqNum(), name);
         op.setPublisherId(myUri);
+
         return applyAndReplicate(op);
     }
 
@@ -116,12 +131,14 @@ public class JavaMessagesRep extends JavaMessages {
     @Override
     protected Result<Message> getCachedMessage(String mid) {
         var cached = super.getCachedMessage(mid);
+
         if (cached.isOK()) return cached;
         // Cache miss — try the DB (message may have been evicted from the 30-s cache)
         var dbResult = DB.getOne(mid, Message.class);
-        if (dbResult.isOK()) {
+
+        if (dbResult.isOK())
             messagesCache.put(mid, dbResult.value()); // re-warm the cache
-        }
+
         return dbResult;
     }
 
@@ -143,11 +160,11 @@ public class JavaMessagesRep extends JavaMessages {
     public void executeLocally(ReplicatedOperation op) {
         try {
             switch (op.getType()) {
-                case POST_MESSAGE       -> execPost(op);
-                case DELETE_MESSAGE     -> execDelete(op);
-                case REMOTE_POST        -> execRemotePost(op);
-                case REMOTE_DELETE      -> execRemoteDelete(op);
-                case DELETE_INBOX       -> execDeleteInbox(op);
+                case POST_MESSAGE -> execPost(op);
+                case DELETE_MESSAGE -> execDelete(op);
+                case REMOTE_POST -> execRemotePost(op);
+                case REMOTE_DELETE -> execRemoteDelete(op);
+                case DELETE_INBOX -> execDeleteInbox(op);
                 case REMOVE_INBOX_ENTRY -> execRemoveInboxEntry(op);
             }
         } catch (Exception e) {
@@ -162,9 +179,12 @@ public class JavaMessagesRep extends JavaMessages {
         // Advance counter past replayed IDs so restarts don't reuse IDs (format: domain+NNNN)
         var mid = msg.getId();
         int plus = mid.lastIndexOf('+');
+
         if (plus >= 0) {
-            try { counter.updateAndGet(c -> Math.max(c, Long.parseLong(mid.substring(plus + 1)))); }
-            catch (NumberFormatException ignored) {}
+            try {
+                counter.updateAndGet(c -> Math.max(c, Long.parseLong(mid.substring(plus + 1))));
+            } catch (NumberFormatException ignored) {
+            }
         }
         messagesCache.put(msg.originId(), new Message(msg));
         messagesCache.put(msg.getId(), msg);
@@ -177,33 +197,33 @@ public class JavaMessagesRep extends JavaMessages {
         if (!op.getRemoteDestinations().isEmpty()) {
             long mySid = op.getKafkaOffset(); // Kafka offset is globally unique across all replicas
             op.getRemoteDestinations().stream()
-                .collect(Collectors.groupingBy(super::getDomain, Collectors.toSet()))
-                .forEach((domain, addrs) ->
-                    jobs.submit(domain, () -> {
-                        var res = tryAllUrisPost(domain, msg, mySid, THIS_DOMAIN);
-                        if (res.error() == ErrorCode.TIMEOUT)
-                            addrs.forEach(a ->
-                                persistToInboxSafe(List.of(msg.senderAddress()),
-                                    msg.cloneWithTimeout(a)));
-                    }));
+                    .collect(Collectors.groupingBy(super::getDomain, Collectors.toSet()))
+                    .forEach((domain, addrs) ->
+                            jobs.submit(domain, () -> {
+                                var res = tryAllUrisPost(domain, msg, mySid, THIS_DOMAIN);
+                                if (res.error() == ErrorCode.TIMEOUT)
+                                    addrs.forEach(a ->
+                                            persistToInboxSafe(List.of(msg.senderAddress()),
+                                                    msg.cloneWithTimeout(a)));
+                            }));
         }
     }
 
     private void execDelete(ReplicatedOperation op) {
         // Delete from local inbox on every replica
         op.getDestinations().stream()
-            .map(r -> r.split("@")[1])
-            .filter(THIS_DOMAIN::equals)
-            .forEach(__ -> deleteFromLocalInbox(op.getMessageId()));
+                .map(r -> r.split("@")[1])
+                .filter(THIS_DOMAIN::equals)
+                .forEach(__ -> deleteFromLocalInbox(op.getMessageId()));
 
         // All replicas attempt cross-domain delete dispatch — SID dedup at destination deduplicates.
         long mySid = op.getKafkaOffset();
         op.getDestinations().stream()
-            .map(r -> r.split("@")[1])
-            .filter(d -> !d.equals(THIS_DOMAIN))
-            .distinct()
-            .forEach(domain -> jobs.submit(domain, () ->
-                tryAllUrisDelete(domain, op.getMessageId(), mySid, THIS_DOMAIN)));
+                .map(r -> r.split("@")[1])
+                .filter(d -> !d.equals(THIS_DOMAIN))
+                .distinct()
+                .forEach(domain -> jobs.submit(domain, () ->
+                        tryAllUrisDelete(domain, op.getMessageId(), mySid, THIS_DOMAIN)));
     }
 
     private void execRemotePost(ReplicatedOperation op) {
@@ -216,6 +236,7 @@ public class JavaMessagesRep extends JavaMessages {
 
         var msg = op.getMessage();
         var known = op.getLocalRecipients() != null ? op.getLocalRecipients() : List.<String>of();
+
         if (!known.isEmpty()) persistToInboxSafe(known, msg);
 
         // Send error back to sender for unknown local recipients (publisher only to avoid dups)
@@ -224,11 +245,12 @@ public class JavaMessagesRep extends JavaMessages {
             allLocal.stream().filter(a -> !known.contains(a)).forEach(addr -> {
                 var errMsg = msg.cloneWithUserNotFound(addr);
                 var senderDomain = getDomain(msg.senderAddress());
+
                 if (isLocalDomain(senderDomain))
                     persistToInboxSafe(List.of(msg.senderAddress()), errMsg);
                 else
                     jobs.submit(senderDomain, () ->
-                        tryAllUrisPost(senderDomain, errMsg, null, null));
+                            tryAllUrisPost(senderDomain, errMsg, null, null));
             });
         }
     }
@@ -245,7 +267,7 @@ public class JavaMessagesRep extends JavaMessages {
     private void execRemoveInboxEntry(ReplicatedOperation op) {
         var entry = new InboxEntry(op.getMessageId(), op.getUserName());
         DB.deleteOne(entry).mapToVoid()
-            .then(() -> gcDeletedMessageCache.put(op.getMessageId(), op.getMessageId()));
+                .then(() -> gcDeletedMessageCache.put(op.getMessageId(), op.getMessageId()));
     }
 
     private void execDeleteInbox(ReplicatedOperation op) {
@@ -268,7 +290,7 @@ public class JavaMessagesRep extends JavaMessages {
             // Pre-cache for idempotency guard (execPost will re-put after Kafka delivery)
             messagesCache.put(msg.originId(), new Message(msg));
 
-            var local  = msg.getDestination().stream().filter(super::isLocalAddress).toList();
+            var local = msg.getDestination().stream().filter(super::isLocalAddress).toList();
             var remote = msg.getDestination().stream()
                     .filter(a -> !isLocalAddress(a)).collect(Collectors.toSet());
             var knownLocal = computeKnownLocal(local);
@@ -287,8 +309,11 @@ public class JavaMessagesRep extends JavaMessages {
 
     private List<String> computeKnownLocal(Collection<String> addresses) {
         if (addresses.isEmpty()) return List.of();
+
         var unknownResult = checkUsers(addresses);
+
         if (!unknownResult.isOK()) return List.of();
+
         var unknown = unknownResult.value();
         return addresses.stream().filter(a -> !unknown.contains(a)).collect(Collectors.toList());
     }
@@ -325,9 +350,10 @@ public class JavaMessagesRep extends JavaMessages {
 
             for (var uri : uris) {
                 res = call.apply(new RestAdminMessagesRepClient(uri.toString()));
-                if (res.isOK()) return res;
+                if (res.isOK())
+                    return res;
             }
-            sd2526.trab.impl.utils.Sleep.ms(500);
+            Sleep.ms(500);
         }
         return res;
     }

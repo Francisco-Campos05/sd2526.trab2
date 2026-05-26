@@ -24,6 +24,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+/**
+ * Central manager for communication with the Kafka broker for the replication process.
+ * Responsible for publishing new operations to the domain's topic and consuming events,
+ * ensuring idempotent execution (filtering already processed SIDs) to protect state.
+ */
 public class KafkaReplicationManager {
 
     private static final Logger Log = Logger.getLogger(KafkaReplicationManager.class.getName());
@@ -72,6 +77,7 @@ public class KafkaReplicationManager {
         long deadline = System.currentTimeMillis() + WRITE_TIMEOUT_MS;
         while (currentOffset.get() < targetOffset) {
             long remaining = deadline - System.currentTimeMillis();
+
             if (remaining <= 0)
                 throw new RuntimeException("Timeout waiting for Kafka offset " + targetOffset);
             wait(remaining);
@@ -82,6 +88,7 @@ public class KafkaReplicationManager {
         long deadline = System.currentTimeMillis() + READ_WAIT_MS;
         while (currentOffset.get() < version) {
             long remaining = deadline - System.currentTimeMillis();
+
             if (remaining <= 0) return;
             try {
                 wait(remaining);
@@ -116,9 +123,11 @@ public class KafkaReplicationManager {
             KafkaConsumer<String, byte[]> consumer = createConsumer(groupId);
             consumer.subscribe(List.of(topic));
             Log.info("Kafka consumer started, groupId=" + groupId);
+
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     var records = consumer.poll(Duration.ofMillis(200));
+
                     for (var record : records) {
                         try {
                             var op = mapper.readValue(record.value(), ReplicatedOperation.class);
@@ -132,7 +141,8 @@ public class KafkaReplicationManager {
                             KafkaReplicationManager.this.notifyAll();
                         }
                     }
-                    if (!records.isEmpty()) consumer.commitSync();
+                    if (!records.isEmpty())
+                        consumer.commitSync();
                 } catch (Exception e) {
                     Log.warning("Kafka consumer error: " + e.getMessage());
                 }
@@ -152,6 +162,7 @@ public class KafkaReplicationManager {
         p.put(ProducerConfig.ACKS_CONFIG, "1");
         p.put(ProducerConfig.RETRIES_CONFIG, 5);
         p.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 10_000);
+
         return new KafkaProducer<>(p);
     }
 
@@ -164,22 +175,25 @@ public class KafkaReplicationManager {
         p.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         p.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         p.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 50);
+
         return new KafkaConsumer<>(p);
     }
 
     private void createTopicIfAbsent() {
         var p = new Properties();
         p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BROKER);
+
         // Retry until Kafka is ready (it may not be up yet when server starts)
         for (int attempt = 0; attempt < 20; attempt++) {
             try (var admin = AdminClient.create(p)) {
                 var existing = admin.listTopics().names().get();
+
                 if (!existing.contains(topic)) {
                     admin.createTopics(List.of(new NewTopic(topic, 1, (short) 1))).all().get();
                     Log.info("Created Kafka topic: " + topic);
-                } else {
+                } else
                     Log.info("Kafka topic already exists: " + topic);
-                }
+
                 return;
             } catch (Exception e) {
                 Log.warning("Kafka not ready (attempt " + attempt + "): " + e.getMessage());

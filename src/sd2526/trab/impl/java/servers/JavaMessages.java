@@ -28,6 +28,11 @@ import static sd2526.trab.api.java.Result.ErrorCode.FORBIDDEN;
 import static sd2526.trab.api.java.Result.error;
 import static sd2526.trab.api.java.Result.ok;
 
+/**
+ * Base implementation of the Messages service for internal domains.
+ * Handles local database persistence and asynchronous message dispatching,
+ * safely executing cross-domain communication tasks.
+ */
 public class JavaMessages extends JavaBaseService implements Messages, AdminMessages {
 
     private static final long MESSAGES_CACHE_EXPIRATION = 30000;
