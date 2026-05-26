@@ -1,212 +1,0 @@
-SD2526 +++ TP2 +++ Testing image: sd2526-trab2
-Version 0.99.2 - 14/05/2026
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-1a )	 Testing Docker environment [executing: docker info]
----------------------------------------------------------------
-Docker ID: 952ba957-4795-455b-ae83-f1c91ab51fe0
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-1b )	Testing: Docker engine CPU cores...
----------------------------------------------------------------
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-1c )	Checking messages.props [executing: docker run sd2526-trab2 /bin/cat messages.props and nunopreguica/sd2526tpbase]
----------------------------------------------------------------
-; Read properties from: ./messages.props
-;	MESSAGES_GRPC_PORT=14567
-;	USERS_REST_EXTRA_ARGS=
-;	USERS_GRPC_PORT=13456
-;	DISCOVERY_MULTICAST_PORT=2266
-;	MESSAGES_GRPC_EXTRA_ARGS=
-;	USERS_KEYSTORES=users.ourorg0,users.ourorg0.ks,changeme users.ourorg1,users.ourorg1.ks,changeme users.ourorg2,users.ourorg2.ks,changeme
-;	MESSAGES_REST_PROXY_SERVER_MAINCLASS=sd2526.trab.impl.rest.servers.RestMessagesServer
-;	CLIENT_TRUSTSTORE=client-truststore.ks
-;	MESSAGES_REP_EXTRA_ARGS_FIRST=primary
-;	MESSAGES_REST_PORT=4567
-;	SERVERS_KEYSTORES=messages0.ourorg0,messages0.ourorg0.ks,changeme messages1.ourorg0,messages1.ourorg0.ks,changeme messages2.ourorg0,messages2.ourorg0.ks,changeme messages0.ourorg1,messages0.ourorg1.ks,changeme messages1.ourorg1,messages1.ourorg1.ks,changeme messages2.ourorg1,messages2.ourorg1.ks,changeme messages.ourorg2,messages.ourorg2.ks,changeme
-;	MESSAGES_REST_PROXY_EXTRA_ARGS=-port 4568
-;	CLIENT_TRUSTSTORE_PWD=changeme
-;	USERS_REST_SERVER_MAINCLASS=sd2526.trab.impl.rest.servers.RestUsersServer
-;	GATEWAY_REST_SERVER_MAINCLASS=sd2526.trab.impl.rest.servers.RestGatewayServer
-;	DISCOVERY_MULTICAST_IP=226.226.226.226
-;	USERS_GRPC_SERVER_MAINCLASS=sd2526.trab.impl.grpc.servers.GrpcUsersServer
-;	GATEWAY_REST_EXTRA_ARGS=
-;	MESSAGES_REST_SERVER_MAINCLASS=sd2526.trab.impl.rest.servers.RestMessagesServer
-;	USERS_REST_PORT=3456
-;	MESSAGES_REST_PROXY_PORT=4568
-;	MESSAGES_REST_EXTRA_ARGS=
-;	MESSAGES_REP_EXTRA_ARGS_OTHER=secondary
-;	GATEWAY_REST_PORT=6666
-;	MESSAGES_GRPC_SERVER_MAINCLASS=sd2526.trab.impl.grpc.servers.GrpcMessagesServer
-;	USERS_GRPC_EXTRA_ARGS=
-;	MESSAGES_REP_SERVER_MAINCLASS=sd2526.trab.impl.rest.servers.RestMessagesRepServer
-;	MESSAGES_REP_PORT=5678
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-1d )	Checking TLS keys in client truststore
----------------------------------------------------------------
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-101a )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-101b )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-101c )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-102a )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-102b )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-102c )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-103a )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-103b )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-103c )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-103d )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-104a )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-104b )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-104c )	  Skipped...
----------------------------------------------------------------
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105a )	 Testing Multi-Domain Message Delivery : [[1,1],[1,1]] REST servers ; [] GRPC servers; [] PROXY servers
----------------------------------------------------------------
-sleeping: 4 s                                                                                sleeping: 3 s                                                                                sleeping: 2 s                                                                                sleeping: 1 s                                                                                sleeping: 0 s                                                                                                                                                                1/5                                                                                2/5                                                                                3/5                                                                                4/5                                                                                5/5                                                                                1/5                                                                                2/5                                                                                3/5                                                                                4/5                                                                                5/5                                                                                ---------- Sending 10 cross-domain messages across 2 domains
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105a )	 Successfully tested cross-domain message delivery across 2 domains
----------------------------------------------------------------
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105b )	 Testing Multi-Domain Partial Delivery (invalid remote destinations) : [[1,1],[1,1]] REST servers ; [] GRPC servers; [] PROXY servers
----------------------------------------------------------------
-sleeping: 4 s                                                                                sleeping: 3 s                                                                                sleeping: 2 s                                                                                sleeping: 1 s                                                                                sleeping: 0 s                                                                                                                                                                1/5                                                                                2/5                                                                                3/5                                                                                4/5                                                                                5/5                                                                                1/5                                                                                2/5                                                                                3/5                                                                                4/5                                                                                5/5                                                                                ---------- Checking failure notifications for unknown remote destinations
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105b )	 Successfully tested partial delivery with invalid remote destinations
----------------------------------------------------------------
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105c )	 Testing Multi-Domain Message Delivery : [] REST servers ; [[1,1],[1,1]] GRPC servers; [] PROXY servers
----------------------------------------------------------------
-sleeping: 4 s                                                                                sleeping: 3 s                                                                                sleeping: 2 s                                                                                sleeping: 1 s                                                                                sleeping: 0 s                                                                                                                                                                1/5                                                                                2/5                                                                                3/5                                                                                4/5                                                                                5/5                                                                                1/5                                                                                2/5                                                                                3/5                                                                                4/5                                                                                5/5                                                                                ---------- Sending 10 cross-domain messages across 2 domains
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105c )	 Successfully tested cross-domain message delivery across 2 domains
----------------------------------------------------------------
-OK                                                                                                                   
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-105d )	 Testing Multi-Domain Partial Delivery (invalid remote destinations) : [] REST servers ; [[1,1],[1,1]] GRPC servers; [] PROXY servers
----------------------------------------------------------------
-sleeping: 4 s                                                                                sleeping: 3 s                                                                                sleeping: 2 s                                                                                sleeping: 1 s                                                                                sleeping: 0 s                                                                                                                                                                1/5                                                                                FAILED: PostUser = User [name=savage.opress31, pwd=3j2t1b0biel962f, domain=ourorg0, displayName=Savage Opress]
-Expected : 200; received : 500
-
-
-=================================================================================
--------------------------------------------------------------------------
------------------------------------------------------------------------------------
-users.ourorg0
------------------------------------------------------------------------------------
-MY DOMAIN:ourorg0
-INFO: Starting discovery on multicast group: /226.226.226.226, port: 2266
-INFO: Starting Discovery announcements on: /226.226.226.226:2266 for: Users@ourorg0 -> grpc://users.ourorg0:13456/grpc
-INFO: Users gRPC Server ready @ grpc://users.ourorg0:13456/grpc
-WARNING: Vulnerable protobuf generated type in use: sd2526.trab.impl.grpc.generated_java.UsersProtoBuf$GrpcUser
-As of 2022/09/29 (release 21.7) makeExtensionsImmutable should not be called from protobuf gencode. If you are seeing this message, your gencode is vulnerable to a denial of service attack. You should regenerate your code using protobuf 25.6 or later. Use the latest version that meets your needs. However, if you understand the risks and wish to continue with vulnerable gencode, you can set the system property `-Dcom.google.protobuf.use_unsafe_pre22_gencode` on the command line to silence this warning. You also can set `-Dcom.google.protobuf.error_on_unsafe_pre22_gencode` to throw an error instead. See security vulnerability: https://github.com/protocolbuffers/protobuf/security/advisories/GHSA-h4h5-3hr4-j3g2INFO: postUser: user=User{name='savage.opress31', pwd='3j2t1b0biel962f', displayName='Savage Opress', domain='ourorg0'}
-INFO: HHH000001: Hibernate ORM core version 7.2.4.FinalWARN: HHH10001002: Using built-in connection pool (not intended for production use)INFO: HHH10001005: Database info:
-	Database JDBC URL [jdbc:hsqldb:file:/tmp/foo]
-	Database driver: HSQL Database Engine Driver
-	Database dialect: HSQLDialect
-	Database version: 2.7.4
-	Default catalog/schema: PUBLIC/PUBLIC
-	Autocommit mode: false
-	Isolation level: READ_COMMITTED
-	JDBC fetch size: none
-	Pool: DriverManagerConnectionProvider
-	Minimum pool size: 1
-Hibernate: create table InboxEntry (mid varchar(255) not null, recipient varchar(255) not null, id varchar(255), primary key (mid, recipient))
-Hibernate: create table Message (id varchar(255) not null, contents varchar(16384), creationTime bigint not null, sender varchar(255), subject varchar(255), primary key (id))
-Hibernate: create table Message_destination (Message_id varchar(255) not null, destination varchar(255))
-Hibernate: create table User (name varchar(255) not null, displayName varchar(255), domain varchar(255), pwd varchar(255), primary key (name))
-Hibernate: alter table InboxEntry add constraint FK_INBOX_MESSAGE FOREIGN KEY (id) REFERENCES Message(id) ON DELETE RESTRICT
-Hibernate: alter table Message_destination add constraint FK490i61489hp4breu8d0xkaokn foreign key (Message_id) references Message
-Hibernate: select u1_0.name,u1_0.displayName,u1_0.domain,u1_0.pwd from User u1_0 where u1_0.name=?
-Hibernate: insert into User (displayName,domain,pwd,name) values (?,?,?,?)
-	Maximum pool size: 64
------------------------------------------------------------------------------------
-messages0.ourorg0
------------------------------------------------------------------------------------
-MY DOMAIN:ourorg0
-INFO: HHH000001: Hibernate ORM core version 7.2.4.FinalWARN: HHH10001002: Using built-in connection pool (not intended for production use)INFO: HHH10001005: Database info:
-	Database JDBC URL [jdbc:hsqldb:file:/tmp/foo]
-	Database driver: HSQL Database Engine Driver
-	Database dialect: HSQLDialect
-	Database version: 2.7.4
-	Default catalog/schema: PUBLIC/PUBLIC
-	Autocommit mode: false
-	Isolation level: READ_COMMITTED
-	JDBC fetch size: none
-	Pool: DriverManagerConnectionProvider
-	Minimum pool size: 1
-Hibernate: create table InboxEntry (mid varchar(255) not null, recipient varchar(255) not null, id varchar(255), primary key (mid, recipient))
-Hibernate: create table Message (id varchar(255) not null, contents varchar(16384), creationTime bigint not null, sender varchar(255), subject varchar(255), primary key (id))
-Hibernate: create table Message_destination (Message_id varchar(255) not null, destination varchar(255))
-Hibernate: create table User (name varchar(255) not null, displayName varchar(255), domain varchar(255), pwd varchar(255), primary key (name))
-Hibernate: alter table InboxEntry add constraint FK_INBOX_MESSAGE FOREIGN KEY (id) REFERENCES Message(id) ON DELETE RESTRICT
-Hibernate: alter table Message_destination add constraint FK490i61489hp4breu8d0xkaokn foreign key (Message_id) references Message
-	Maximum pool size: 64INFO: Starting discovery on multicast group: /226.226.226.226, port: 2266
-INFO: Starting Discovery announcements on: /226.226.226.226:2266 for: Messages@ourorg0 -> grpc://messages0.ourorg0:14567/grpc
-INFO: Messages gRPC Server ready @ grpc://messages0.ourorg0:14567/grpc
-
------------------------------------------------------------------------------------
-users.ourorg1
------------------------------------------------------------------------------------
-MY DOMAIN:ourorg1
-INFO: Starting discovery on multicast group: /226.226.226.226, port: 2266
-INFO: Starting Discovery announcements on: /226.226.226.226:2266 for: Users@ourorg1 -> grpc://users.ourorg1:13456/grpc
-INFO: Users gRPC Server ready @ grpc://users.ourorg1:13456/grpc
-
------------------------------------------------------------------------------------
-messages0.ourorg1
------------------------------------------------------------------------------------
-MY DOMAIN:ourorg1
-INFO: HHH000001: Hibernate ORM core version 7.2.4.FinalWARN: HHH10001002: Using built-in connection pool (not intended for production use)INFO: HHH10001005: Database info:
-	Database JDBC URL [jdbc:hsqldb:file:/tmp/foo]
-	Database driver: HSQL Database Engine Driver
-	Database dialect: HSQLDialect
-	Database version: 2.7.4
-	Default catalog/schema: PUBLIC/PUBLIC
-	Autocommit mode: false
-	Isolation level: READ_COMMITTED
-	JDBC fetch size: none
-	Pool: DriverManagerConnectionProvider
-	Minimum pool size: 1
-Hibernate: create table InboxEntry (mid varchar(255) not null, recipient varchar(255) not null, id varchar(255), primary key (mid, recipient))
-Hibernate: create table Message (id varchar(255) not null, contents varchar(16384), creationTime bigint not null, sender varchar(255), subject varchar(255), primary key (id))
-Hibernate: create table Message_destination (Message_id varchar(255) not null, destination varchar(255))
-Hibernate: create table User (name varchar(255) not null, displayName varchar(255), domain varchar(255), pwd varchar(255), primary key (name))
-Hibernate: alter table InboxEntry add constraint FK_INBOX_MESSAGE FOREIGN KEY (id) REFERENCES Message(id) ON DELETE RESTRICT
-Hibernate: alter table Message_destination add constraint FK490i61489hp4breu8d0xkaokn foreign key (Message_id) references Message
-	Maximum pool size: 64INFO: Starting discovery on multicast group: /226.226.226.226, port: 2266
-INFO: Starting Discovery announcements on: /226.226.226.226:2266 for: Messages@ourorg1 -> grpc://messages0.ourorg1:14567/grpc
-INFO: Messages gRPC Server ready @ grpc://messages0.ourorg1:14567/grpc
-
-=================================================================================
-
-
-Continue (Y/N) ?
-Test complete...

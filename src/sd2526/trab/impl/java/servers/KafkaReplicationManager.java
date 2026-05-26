@@ -31,12 +31,12 @@ public class KafkaReplicationManager {
     public static final String BROKER = "kafka:9092";
     private static final String TOPIC_PREFIX = "Messages-";
     private static final long WRITE_TIMEOUT_MS = 15_000;
-    private static final long READ_WAIT_MS     = 3_000;
+    private static final long READ_WAIT_MS = 3_000;
 
     private final String topic;
     private final KafkaProducer<String, byte[]> producer;
     private final AtomicLong currentOffset = new AtomicLong(-1L);
-    private final AtomicLong seqCounter    = new AtomicLong(0L);
+    private final AtomicLong seqCounter = new AtomicLong(0L);
     // Set-based SID dedup: accepts messages arriving in any order, rejects only genuine retries
     private final Map<String, Set<Long>> seenSidsFromDomain = new ConcurrentHashMap<>();
     private final ObjectMapper mapper = new ObjectMapper();
@@ -50,9 +50,13 @@ public class KafkaReplicationManager {
 
     // ---- Sequence / version ----
 
-    public long nextSeqNum() { return seqCounter.incrementAndGet(); }
+    public long nextSeqNum() {
+        return seqCounter.incrementAndGet();
+    }
 
-    public long getCurrentOffset() { return currentOffset.get(); }
+    public long getCurrentOffset() {
+        return currentOffset.get();
+    }
 
     // ---- Publish ----
 
@@ -79,8 +83,11 @@ public class KafkaReplicationManager {
         while (currentOffset.get() < version) {
             long remaining = deadline - System.currentTimeMillis();
             if (remaining <= 0) return;
-            try { wait(remaining); } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); return;
+            try {
+                wait(remaining);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
             }
         }
     }
@@ -93,9 +100,13 @@ public class KafkaReplicationManager {
      * Set-based approach handles out-of-order arrivals correctly, unlike a monotonic tracker.
      */
     public boolean checkAndUpdateSid(String sourceDomain, long sid) {
-        return seenSidsFromDomain
-                .computeIfAbsent(sourceDomain, k -> ConcurrentHashMap.newKeySet())
-                .add(sid);
+        var set = seenSidsFromDomain.computeIfAbsent(sourceDomain, k -> ConcurrentHashMap.newKeySet());
+
+        // Se a cache passar dos 10000 registos, esvazia-a para proteger a memória
+        if (set.size() > 10000)
+            set.clear();
+
+        return set.add(sid);
     }
 
     // ---- Consumer ----
@@ -172,7 +183,12 @@ public class KafkaReplicationManager {
                 return;
             } catch (Exception e) {
                 Log.warning("Kafka not ready (attempt " + attempt + "): " + e.getMessage());
-                try { Thread.sleep(1000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return; }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
         }
         Log.severe("Could not connect to Kafka after retries");

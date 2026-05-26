@@ -19,15 +19,12 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Predicate;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import static sd2526.trab.api.java.Result.ErrorCode.*;
+import static sd2526.trab.api.java.Result.ErrorCode.BAD_REQUEST;
+import static sd2526.trab.api.java.Result.ErrorCode.FORBIDDEN;
 import static sd2526.trab.api.java.Result.error;
 import static sd2526.trab.api.java.Result.ok;
 
@@ -145,7 +142,6 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 
             return ok();
         });
-
     }
 
     private void reportUnknownLocalRecipients(Collection<String> addresses, Message msg) {
@@ -302,7 +298,6 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
 
                     return ok();
                 }));
-
     }
 
     static JavaMessages instance;
