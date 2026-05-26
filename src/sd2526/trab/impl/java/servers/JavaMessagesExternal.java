@@ -422,25 +422,6 @@ public class JavaMessagesExternal extends JavaBaseService implements Messages, A
         }
     }
 
-    private Result<User> getUser(String address, String pwd) {
-        try {
-            String name = address.split("@", 2)[0];
-            return Clients.UsersClient.get().getUser(name, pwd);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return error(INTERNAL_ERROR);
-        }
-    }
-
-    private List<String> getLocalRecipients(Message msg) {
-        return msg.getDestination().stream().filter(this::isLocalAddress).toList();
-    }
-
-    private Set<String> getRemoteRecipients(Message msg) {
-        return msg.getDestination().stream()
-                .filter(a -> !isLocalAddress(a)).collect(Collectors.toSet());
-    }
-
     /**
      * Returns the synchronized inbox list for a recipient, creating it if absent.
      */

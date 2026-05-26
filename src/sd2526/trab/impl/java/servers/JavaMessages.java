@@ -131,17 +131,6 @@ public class JavaMessages extends JavaBaseService implements Messages, AdminMess
                 .thenWith((msg) -> doAsyncDelete(msg));
     }
 
-
-    protected Result<User> getUser(String user, String pwd) {
-        try {
-            var name = user.split("@", 2)[0];
-            return Clients.UsersClient.get().getUser(name, pwd);
-        } catch (Exception x) {
-            x.printStackTrace();
-            return Result.error(INTERNAL_ERROR);
-        }
-    }
-
     protected Result<Set<String>> checkUsers(Collection<String> addresses) {
         return Clients.AdminUsersClient.get().checkUsers(addresses);
     }
